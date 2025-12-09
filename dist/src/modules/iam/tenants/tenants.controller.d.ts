@@ -1,0 +1,108 @@
+import { TenantsService } from './tenants.service';
+import { CreateTenantDto, UpdateTenantDto, TenantQueryDto } from './dto/tenant.dto';
+import type { AuthenticatedUser } from '../../../common/interfaces';
+export declare class TenantsController {
+    private readonly tenantsService;
+    constructor(tenantsService: TenantsService);
+    create(dto: CreateTenantDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        path: string;
+        parentId: string | null;
+        contactFirstName: string | null;
+        contactLastName: string | null;
+        contactPhone: string | null;
+        contactEmail: string | null;
+        taxId: string | null;
+        taxOffice: string | null;
+        address: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: import("@prisma/client/runtime/library").Decimal | null;
+        longitude: import("@prisma/client/runtime/library").Decimal | null;
+        subscriptionStatus: import("@prisma/client").$Enums.SubscriptionStatus;
+        subscriptionPlan: string | null;
+        settings: import("@prisma/client/runtime/library").JsonValue | null;
+    }>;
+    findAll(query: TenantQueryDto, user: AuthenticatedUser): Promise<import("../../../common/interfaces").PaginatedResult<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        path: string;
+        parentId: string | null;
+        contactFirstName: string | null;
+        contactLastName: string | null;
+        contactPhone: string | null;
+        contactEmail: string | null;
+        taxId: string | null;
+        taxOffice: string | null;
+        address: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: import("@prisma/client/runtime/library").Decimal | null;
+        longitude: import("@prisma/client/runtime/library").Decimal | null;
+        subscriptionStatus: import("@prisma/client").$Enums.SubscriptionStatus;
+        subscriptionPlan: string | null;
+        settings: import("@prisma/client/runtime/library").JsonValue | null;
+    }>>;
+    getTree(user: AuthenticatedUser): Promise<any[]>;
+    findOne(id: string, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        path: string;
+        parentId: string | null;
+        contactFirstName: string | null;
+        contactLastName: string | null;
+        contactPhone: string | null;
+        contactEmail: string | null;
+        taxId: string | null;
+        taxOffice: string | null;
+        address: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: import("@prisma/client/runtime/library").Decimal | null;
+        longitude: import("@prisma/client/runtime/library").Decimal | null;
+        subscriptionStatus: import("@prisma/client").$Enums.SubscriptionStatus;
+        subscriptionPlan: string | null;
+        settings: import("@prisma/client/runtime/library").JsonValue | null;
+    }>;
+    getStats(id: string, user: AuthenticatedUser): Promise<{
+        tenant: {
+            id: string;
+            name: string;
+            path: string;
+        };
+        stats: {
+            total_consumption: number;
+            avg_consumption: number;
+            max_consumption: number;
+            min_consumption: number;
+            reading_count: number;
+            active_meters: number;
+            totalMeters: number;
+            totalCustomers: number;
+            activeAlarms: number;
+            childTenants: number;
+        };
+    }>;
+    update(id: string, dto: UpdateTenantDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        path: string;
+        parentId: string | null;
+        contactFirstName: string | null;
+        contactLastName: string | null;
+        contactPhone: string | null;
+        contactEmail: string | null;
+        taxId: string | null;
+        taxOffice: string | null;
+        address: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: import("@prisma/client/runtime/library").Decimal | null;
+        longitude: import("@prisma/client/runtime/library").Decimal | null;
+        subscriptionStatus: import("@prisma/client").$Enums.SubscriptionStatus;
+        subscriptionPlan: string | null;
+        settings: import("@prisma/client/runtime/library").JsonValue | null;
+    }>;
+    delete(id: string, user: AuthenticatedUser): Promise<void>;
+}

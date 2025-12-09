@@ -1,0 +1,650 @@
+// =============================================================================
+// Read Water - Prisma Schema
+// =============================================================================
+// High-performance, multi-tenant water meter reading platform
+// PostgreSQL with TimescaleDB (time-series) and ltree (hierarchical tenancy)
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [timescaledb, ltree, uuid_ossp(map: "uuid-ossp"), pgcrypto]
+}
+
+// =============================================================================
+// ENUMS - Definitions from Section 6 of Functional Specifications
+// =============================================================================
+
+// 6.1 Meter Types
+enum MeterType {
+  SINGLE_JET
+  MULTI_JET
+  WOLTMAN_PARALEL
+  WOLTMAN_VERTICAL
+  VOLUMETRIC
+  ULTRASONIC
+  ELECTROMAGNETIC
+  COMPOUND
+  IRRIGATION
+}
+
+// 6.2 Dial Types
+enum DialType {
+  SEMI_DRY
+  DRY
+  SUPER_DRY
+  WET
+}
+
+// 6.3 Temperature Types
+enum TemperatureType {
+  T30 // Cold
+  T90 // Hot
+}
+
+// 6.4 Mounting Types
+enum MountingType {
+  VERTICAL
+  HORIZONTAL
+  BOTH
+}
+
+// 6.5 Connection Types
+enum ConnectionType {
+  THREAD // Dişli / Rakorlu
+  FLANGE // Flanşlı
+}
+
+// 6.6 Communication Modules
+enum CommunicationModule {
+  INTEGRATED
+  RETROFIT
+  NONE
+}
+
+// 6.7 Brands
+enum Brand {
+  BAYLAN
+  MANAS
+  KLEPSAN
+  CEM
+  ZENNER
+  TURKOGLU
+  BEREKET
+  TEKSAN
+}
+
+// 6.8 Communication Technologies
+enum CommunicationTechnology {
+  SIGFOX
+  LORAWAN
+  NB_IOT
+  WM_BUS
+  MIOTY
+  WIFI
+  BLUETOOTH
+  NFC
+  OMS
+}
+
+// 6.9 Integration Technologies
+enum IntegrationType {
+  HTTP
+  MQTT
+  API
+}
+
+// 6.10 Consumption Types
+enum ConsumptionType {
+  NORMAL
+  HIGH
+}
+
+// 6.11 Customer Types
+enum CustomerType {
+  INDIVIDUAL
+  ORGANIZATIONAL
+}
+
+// 6.12 Meter Statuses
+enum MeterStatus {
+  ACTIVE
+  PASSIVE
+  WAREHOUSE
+  MAINTENANCE
+  PLANNED
+  DEPLOYED // Deployed but not started
+}
+
+// 6.13 IP Ratings
+enum IPRating {
+  IP54
+  IP65
+  IP67
+  IP68
+}
+
+// 6.14 System Roles
+enum SystemRole {
+  PLATFORM_ADMIN
+  TENANT_ADMIN
+  OPERATOR
+  VIEWER
+  FIELD_ENGINEER
+  CUSTOMER
+}
+
+// Alarm Types for Dashboard
+enum AlarmType {
+  TAMPER
+  LOW_BATTERY
+  TILT
+  REVERSE_FLOW
+  HIGH_USAGE
+  NO_SIGNAL
+  VALVE_ERROR
+  COMMUNICATION_ERROR
+}
+
+// Alarm Status
+enum AlarmStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+// Subscription Status for Tenants
+enum SubscriptionStatus {
+  ACTIVE
+  PASSIVE
+  TRIAL
+  SUSPENDED
+}
+
+// Valve Status for Meters
+enum ValveStatus {
+  OPEN
+  CLOSED
+  UNKNOWN
+  NOT_APPLICABLE
+}
+
+// =============================================================================
+// MODELS - Core Entities
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 10.1 Tenants - Hierarchical Multi-Tenancy using ltree
+// -----------------------------------------------------------------------------
+model Tenant {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Hierarchical path using ltree (e.g., "Root.Region_A.City_1")
+  // Stored as String in Prisma, ltree in PostgreSQL
+  path     String @unique
+  name     String
+  parentId String? @map("parent_id") @db.Uuid
+
+  // Contact Information
+  contactFirstName String? @map("contact_first_name")
+  contactLastName  String? @map("contact_last_name")
+  contactPhone     String? @map("contact_phone")
+  contactEmail     String? @map("contact_email")
+
+  // Tax Information
+  taxId     String? @map("tax_id")
+  taxOffice String? @map("tax_office")
+
+  // Address - Embedded as JSON for flexibility
+  address Json? @db.JsonB
+
+  // Location
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  // Subscription
+  subscriptionStatus SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  subscriptionPlan   String?            @map("subscription_plan")
+
+  // Settings
+  settings Json? @db.JsonB
+
+  // Relations
+  parent           Tenant?        @relation("TenantHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children         Tenant[]       @relation("TenantHierarchy")
+  users            UserTenant[]
+  customers        Customer[]
+  meters           Meter[]
+  readings         Reading[]
+  alarms           Alarm[]
+  allowedProfiles  MeterProfile[] @relation("TenantAllowedProfiles")
+
+  @@index([path])
+  @@index([parentId])
+  @@map("tenants")
+}
+
+// -----------------------------------------------------------------------------
+// 10.2 Users
+// -----------------------------------------------------------------------------
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Personal Information
+  firstName String  @map("first_name")
+  lastName  String  @map("last_name")
+  email     String  @unique
+  phone     String?
+  tcIdNo    String? @map("tc_id_no") // Turkish ID Number
+
+  // Authentication
+  passwordHash String  @map("password_hash")
+  isActive     Boolean @default(true) @map("is_active")
+
+  // Activity Tracking
+  lastLoginAt DateTime? @map("last_login_at")
+  lastLoginIp String?   @map("last_login_ip")
+
+  // Profile
+  avatarUrl  String?  @map("avatar_url")
+  language   String   @default("en") // en, tr, fr
+  timezone   String   @default("UTC")
+  metadata   Json?    @db.JsonB
+
+  // Relations
+  tenants       UserTenant[]
+  activityLogs  ActivityLog[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// -----------------------------------------------------------------------------
+// User-Tenant Many-to-Many with Role
+// -----------------------------------------------------------------------------
+model UserTenant {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId   String     @map("user_id") @db.Uuid
+  tenantId String     @map("tenant_id") @db.Uuid
+  role     SystemRole
+
+  // Custom permissions override (optional)
+  permissions String[] @default([])
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@map("user_tenants")
+}
+
+// -----------------------------------------------------------------------------
+// Activity Log for Users
+// -----------------------------------------------------------------------------
+model ActivityLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId    String  @map("user_id") @db.Uuid
+  action    String  // e.g., "user.login", "meter.create", "reading.export"
+  resource  String? // e.g., "meter", "customer"
+  resourceId String? @map("resource_id")
+  details   Json?   @db.JsonB
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// -----------------------------------------------------------------------------
+// 3. Customers
+// -----------------------------------------------------------------------------
+model Customer {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenantId String @map("tenant_id") @db.Uuid
+
+  // Customer Classification
+  customerType    CustomerType
+  consumptionType ConsumptionType @default(NORMAL) @map("consumption_type")
+
+  // Dynamic Customer Details stored in JSONB
+  // For Individual: { firstName, lastName, tcIdNo, phone, email }
+  // For Organizational: { organizationName, taxId, taxOffice, contactFirstName, contactLastName, contactPhone, contactEmail }
+  details Json @db.JsonB
+
+  // Main Address - Embedded as JSON
+  // Contains: city, district, neighborhood, street, buildingNo, floor, doorNo, postalCode, extraDetails
+  address     Json     @db.JsonB
+  addressCode String?  @map("address_code") // TC Address Code
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+
+  // Additional metadata
+  metadata Json? @db.JsonB
+
+  // Relations
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  meters   Meter[]
+
+  @@index([tenantId])
+  @@index([customerType])
+  @@map("customers")
+}
+
+// -----------------------------------------------------------------------------
+// 5.1 Meter Profiles (System Configuration)
+// -----------------------------------------------------------------------------
+model MeterProfile {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Brand + Model must be unique
+  brand     Brand
+  modelCode String @map("model_code")
+
+  // Meter Classification
+  meterType       MeterType       @map("meter_type")
+  dialType        DialType        @map("dial_type")
+  connectionType  ConnectionType  @map("connection_type")
+  mountingType    MountingType    @map("mounting_type")
+  temperatureType TemperatureType @map("temperature_type")
+
+  // Physical Specifications
+  diameter     Int? // mm
+  length       Int? // mm
+  width        Int? // mm
+  height       Int? // mm
+
+  // Flow Rates (m³/h)
+  q1           Decimal? @db.Decimal(10, 4) // Qmin
+  q2           Decimal? @db.Decimal(10, 4) // Qt
+  q3           Decimal? @db.Decimal(10, 4) // Qn
+  q4           Decimal? @db.Decimal(10, 4) // Qmax
+  rValue       Decimal? @map("r_value") @db.Decimal(10, 2) // Q3/Q1
+  pressureLoss Decimal? @map("pressure_loss") @db.Decimal(10, 4)
+
+  // Protection
+  ipRating IPRating? @map("ip_rating")
+
+  // Communication Configuration
+  communicationModule CommunicationModule @default(NONE) @map("communication_module")
+  batteryLifeMonths   Int?                @map("battery_life_months")
+
+  // Communication Technologies Configuration
+  // Array of technology configs with decoder functions and field definitions
+  // Example: [{ technology: "LORAWAN", fields: [...], decoder: "function(payload) {...}" }]
+  communicationConfigs Json[] @default([]) @map("communication_configs") @db.JsonB
+
+  // Additional specifications
+  specifications Json? @db.JsonB
+
+  // Relations
+  meters         Meter[]
+  allowedTenants Tenant[] @relation("TenantAllowedProfiles")
+
+  @@unique([brand, modelCode])
+  @@index([brand])
+  @@index([meterType])
+  @@map("meter_profiles")
+}
+
+// -----------------------------------------------------------------------------
+// 4. Meters
+// -----------------------------------------------------------------------------
+model Meter {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenantId       String  @map("tenant_id") @db.Uuid
+  customerId     String? @map("customer_id") @db.Uuid
+  meterProfileId String  @map("meter_profile_id") @db.Uuid
+
+  // Identification
+  serialNumber String @unique @map("serial_number")
+
+  // Initial Setup
+  initialIndex     Decimal  @default(0) @map("initial_index") @db.Decimal(15, 3)
+  installationDate DateTime @map("installation_date")
+
+  // Current Status
+  status      MeterStatus @default(WAREHOUSE)
+  valveStatus ValveStatus @default(NOT_APPLICABLE) @map("valve_status")
+
+  // Last Reading Cache (for quick access)
+  lastReadingValue Decimal?  @map("last_reading_value") @db.Decimal(15, 3)
+  lastReadingTime  DateTime? @map("last_reading_time")
+  lastSignalStrength Int?    @map("last_signal_strength") // dBm
+  lastBatteryLevel   Int?    @map("last_battery_level")   // percentage
+
+  // WAN Connectivity Configuration stored in JSONB
+  // Structure: { primary: { technology, fields }, secondary: { technology, fields }, others: [...] }
+  connectivityConfig Json @default("{}") @map("connectivity_config") @db.JsonB
+
+  // Address
+  address     Json     @db.JsonB
+  addressCode String?  @map("address_code")
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+
+  // Metadata for additional fields
+  metadata Json? @db.JsonB
+
+  // Relations
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  meterProfile MeterProfile @relation(fields: [meterProfileId], references: [id], onDelete: Restrict)
+  readings     Reading[]
+  alarms       Alarm[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@index([serialNumber])
+  @@map("meters")
+}
+
+// -----------------------------------------------------------------------------
+// 2. Readings - TimescaleDB Hypertable
+// -----------------------------------------------------------------------------
+// Note: This table is a TimescaleDB hypertable partitioned by 'time'
+// Foreign keys are NOT enforced at DB level to allow hypertable features
+model Reading {
+  id String @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Time column for TimescaleDB hypertable partitioning (TIMESTAMPTZ)
+  time DateTime @default(now()) @db.Timestamptz()
+
+  tenantId String @map("tenant_id") @db.Uuid
+  meterId  String @map("meter_id") @db.Uuid
+
+  // Reading Values
+  value         Decimal @db.Decimal(15, 3) // Current meter index
+  consumption   Decimal @db.Decimal(15, 3) // Consumption since last reading
+  unit          String  @default("m3")     // Unit of measurement
+
+  // Signal/Device Info at time of reading
+  signalStrength Int? @map("signal_strength") // dBm
+  batteryLevel   Int? @map("battery_level")   // percentage
+  temperature    Decimal? @db.Decimal(5, 2)   // °C
+
+  // Raw payload from device (for debugging/reprocessing)
+  rawPayload Json? @map("raw_payload") @db.JsonB
+
+  // Source information
+  source          String?                 // e.g., "LORAWAN", "HTTP", "MANUAL"
+  sourceDeviceId  String? @map("source_device_id")
+  communicationTechnology CommunicationTechnology? @map("communication_technology")
+
+  // Processing metadata
+  processedAt DateTime? @map("processed_at") @db.Timestamptz()
+  decoderUsed String?   @map("decoder_used")
+
+  // Note: Relations are logical only - FK not enforced for TimescaleDB hypertable
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  meter  Meter?  @relation(fields: [meterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Composite primary key required for TimescaleDB hypertable
+  @@id([id, time])
+  @@index([time(sort: Desc)])
+  @@index([meterId, time(sort: Desc)])
+  @@index([tenantId, time(sort: Desc)])
+  @@map("readings")
+}
+
+// -----------------------------------------------------------------------------
+// Alarms - Dashboard Alerts
+// -----------------------------------------------------------------------------
+model Alarm {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenantId String @map("tenant_id") @db.Uuid
+  meterId  String @map("meter_id") @db.Uuid
+
+  // Alarm Details
+  type        AlarmType
+  status      AlarmStatus @default(ACTIVE)
+  severity    Int         @default(1) // 1-5, 5 being most severe
+  message     String?
+  details     Json?       @db.JsonB
+
+  // Resolution
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String?   @map("acknowledged_by") @db.Uuid
+  resolvedAt     DateTime? @map("resolved_at")
+  resolvedBy     String?   @map("resolved_by") @db.Uuid
+  resolution     String?
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  meter  Meter  @relation(fields: [meterId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([meterId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("alarms")
+}
+
+// -----------------------------------------------------------------------------
+// 7. Settings - Platform Configuration
+// -----------------------------------------------------------------------------
+model Setting {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Setting can be global or tenant-specific
+  tenantId String? @map("tenant_id") @db.Uuid
+
+  key   String
+  value Json   @db.JsonB
+
+  // For grouped settings
+  category String?
+
+  @@unique([tenantId, key])
+  @@index([category])
+  @@map("settings")
+}
+
+// -----------------------------------------------------------------------------
+// 9. Decoder Functions - Stored separately for easy management
+// -----------------------------------------------------------------------------
+model DecoderFunction {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  name                    String
+  description             String?
+  communicationTechnology CommunicationTechnology @map("communication_technology")
+
+  // The JavaScript decoder function code
+  // Example: "function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }"
+  code String @db.Text
+
+  // Version tracking
+  version   Int     @default(1)
+  isActive  Boolean @default(true) @map("is_active")
+
+  // Testing
+  testPayload       String? @map("test_payload")
+  expectedOutput    Json?   @map("expected_output") @db.JsonB
+  lastTestedAt      DateTime? @map("last_tested_at")
+  lastTestSucceeded Boolean?  @map("last_test_succeeded")
+
+  // Associated meter profile reference (stored as metadata)
+  metadata Json? @db.JsonB
+
+  @@index([communicationTechnology])
+  @@index([isActive])
+  @@map("decoder_functions")
+}
+
+// -----------------------------------------------------------------------------
+// Communication Technology Field Definitions
+// Defines what fields are required for each technology when adding meters
+// -----------------------------------------------------------------------------
+model CommunicationTechFieldDef {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  technology CommunicationTechnology @unique
+
+  // Field definitions as JSON array
+  // Example for LoRaWAN: [
+  //   { name: "DevEUI", type: "hex", length: 16, regex: "^[a-fA-F0-9]{16}$", required: true },
+  //   { name: "JoinEUI", type: "hex", length: 16, regex: "^[a-fA-F0-9]{16}$", required: true },
+  //   { name: "AppKey", type: "hex", length: 32, regex: "^[a-fA-F0-9]{32}$", required: true }
+  // ]
+  fields Json @db.JsonB
+
+  // Supported integration types
+  integrationTypes IntegrationType[]  @default([]) @map("integration_types")
+
+  @@map("communication_tech_field_defs")
+}
+
+// -----------------------------------------------------------------------------
+// Refresh Tokens for JWT
+// -----------------------------------------------------------------------------
+model RefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
