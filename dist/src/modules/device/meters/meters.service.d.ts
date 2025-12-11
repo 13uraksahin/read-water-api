@@ -1,6 +1,6 @@
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { KyselyService } from '../../../core/kysely/kysely.service';
-import { CreateMeterDto, UpdateMeterDto, MeterQueryDto, ControlValveDto } from './dto/meter.dto';
+import { CreateMeterDto, UpdateMeterDto, MeterQueryDto, ControlValveDto, LinkDeviceDto, UnlinkDeviceDto } from './dto/meter.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../../common/interfaces';
 import { Meter } from '@prisma/client';
 export declare class MetersService {
@@ -13,6 +13,8 @@ export declare class MetersService {
     findOne(id: string, user: AuthenticatedUser): Promise<Meter>;
     update(id: string, dto: UpdateMeterDto, user: AuthenticatedUser): Promise<Meter>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
+    linkDevice(meterId: string, dto: LinkDeviceDto, user: AuthenticatedUser): Promise<Meter>;
+    unlinkDevice(meterId: string, dto: UnlinkDeviceDto, user: AuthenticatedUser): Promise<Meter>;
     controlValve(id: string, dto: ControlValveDto, user: AuthenticatedUser): Promise<Meter>;
     getReadingHistory(id: string, user: AuthenticatedUser, days?: number): Promise<{
         bucket: Date;
@@ -20,5 +22,4 @@ export declare class MetersService {
         avg_consumption: number;
         reading_count: number;
     }[]>;
-    private validateConnectivityConfig;
 }

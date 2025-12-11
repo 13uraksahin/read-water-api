@@ -1,5 +1,5 @@
 // =============================================================================
-// Common Interfaces
+// Common Interfaces - Refactored for Asset/Device Split
 // =============================================================================
 
 import { SystemRole } from '@prisma/client';
@@ -52,11 +52,12 @@ export interface PaginatedResult<T> {
   };
 }
 
-// Reading Job Data
+// Reading Job Data - Updated for new device-based flow
 export interface ReadingJobData {
   tenantId: string;
   meterId?: string;
-  deviceId: string;
+  deviceId: string; // The device identifier from payload (e.g., DevEUI)
+  internalDeviceId?: string; // Our internal device UUID
   technology: string;
   payload: string;
   timestamp: Date;
@@ -105,20 +106,13 @@ export interface TechFieldDefinition {
   description?: string;
 }
 
-// Connectivity Config
-export interface ConnectivityConfig {
-  primary?: {
-    technology: string;
-    fields: Record<string, string>;
-  };
-  secondary?: {
-    technology: string;
-    fields: Record<string, string>;
-  };
-  others?: Array<{
-    technology: string;
-    fields: Record<string, string>;
-  }>;
+// Device Lookup Result (used in ingestion)
+export interface DeviceLookupResult {
+  deviceId: string;       // Internal device UUID
+  tenantId: string;
+  meterId: string | null; // Linked meter UUID (null if not linked)
+  deviceProfileId: string;
+  decoderFunction: string | null;
 }
 
 // Customer Details (Individual)
@@ -140,4 +134,3 @@ export interface OrganizationalCustomerDetails {
   contactPhone?: string;
   contactEmail?: string;
 }
-

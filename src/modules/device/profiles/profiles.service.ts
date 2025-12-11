@@ -1,5 +1,8 @@
 // =============================================================================
-// Meter Profiles Service
+// Meter Profiles Service - Refactored for Asset/Device Split
+// =============================================================================
+// REMOVED: communicationConfigs, batteryLifeMonths (now in DeviceProfile)
+// ADDED: Compatible device profiles management
 // =============================================================================
 
 import {
@@ -69,9 +72,23 @@ export class ProfilesService {
         pressureLoss: dto.pressureLoss,
         ipRating: dto.ipRating,
         communicationModule: dto.communicationModule,
-        batteryLifeMonths: dto.batteryLifeMonths,
-        communicationConfigs: dto.communicationConfigs as any[],
         specifications: dto.specifications as any,
+        // Connect compatible device profiles if provided
+        compatibleDeviceProfiles: dto.compatibleDeviceProfileIds
+          ? {
+              connect: dto.compatibleDeviceProfileIds.map((id) => ({ id })),
+            }
+          : undefined,
+      },
+      include: {
+        compatibleDeviceProfiles: {
+          select: {
+            id: true,
+            brand: true,
+            modelCode: true,
+            communicationTechnology: true,
+          },
+        },
       },
     });
 
@@ -112,6 +129,14 @@ export class ProfilesService {
           [query.sortBy || 'brand']: query.sortOrder || 'asc',
         },
         include: {
+          compatibleDeviceProfiles: {
+            select: {
+              id: true,
+              brand: true,
+              modelCode: true,
+              communicationTechnology: true,
+            },
+          },
           _count: {
             select: { meters: true },
           },
@@ -142,6 +167,15 @@ export class ProfilesService {
       include: {
         allowedTenants: {
           select: { id: true, name: true, path: true },
+        },
+        compatibleDeviceProfiles: {
+          select: {
+            id: true,
+            brand: true,
+            modelCode: true,
+            communicationTechnology: true,
+            batteryLifeMonths: true,
+          },
         },
         _count: {
           select: { meters: true },
@@ -189,9 +223,23 @@ export class ProfilesService {
         pressureLoss: dto.pressureLoss,
         ipRating: dto.ipRating,
         communicationModule: dto.communicationModule,
-        batteryLifeMonths: dto.batteryLifeMonths,
-        communicationConfigs: dto.communicationConfigs as any[],
         specifications: dto.specifications as any,
+        // Update compatible device profiles if provided
+        compatibleDeviceProfiles: dto.compatibleDeviceProfileIds
+          ? {
+              set: dto.compatibleDeviceProfileIds.map((id) => ({ id })),
+            }
+          : undefined,
+      },
+      include: {
+        compatibleDeviceProfiles: {
+          select: {
+            id: true,
+            brand: true,
+            modelCode: true,
+            communicationTechnology: true,
+          },
+        },
       },
     });
 
@@ -243,5 +291,20 @@ export class ProfilesService {
       orderBy: { technology: 'asc' },
     });
   }
-}
 
+  /**
+   * Get all device profiles (for compatibility selection)
+   */
+  async getDeviceProfiles() {
+    return this.prisma.deviceProfile.findMany({
+      select: {
+        id: true,
+        brand: true,
+        modelCode: true,
+        communicationTechnology: true,
+        batteryLifeMonths: true,
+      },
+      orderBy: [{ brand: 'asc' }, { modelCode: 'asc' }],
+    });
+  }
+}

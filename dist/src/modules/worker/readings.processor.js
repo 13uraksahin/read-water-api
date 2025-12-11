@@ -37,7 +37,7 @@ let ReadingsProcessor = ReadingsProcessor_1 = class ReadingsProcessor extends bu
         this.decoderService = decoderService;
     }
     async process(job) {
-        const { tenantId, meterId, deviceId, technology, payload, timestamp, metadata } = job.data;
+        const { tenantId, meterId, deviceId, internalDeviceId, technology, payload, timestamp, metadata } = job.data;
         this.logger.debug(`Processing job ${job.id} for device ${deviceId}`);
         try {
             const meter = await this.prisma.meter.findUnique({
@@ -48,12 +48,29 @@ let ReadingsProcessor = ReadingsProcessor_1 = class ReadingsProcessor extends bu
                     meterProfileId: true,
                     lastReadingValue: true,
                     initialIndex: true,
+                    activeDeviceId: true,
+                    activeDevice: {
+                        select: {
+                            id: true,
+                            deviceProfileId: true,
+                            deviceProfile: {
+                                select: {
+                                    id: true,
+                                    decoderFunction: true,
+                                },
+                            },
+                        },
+                    },
                 },
             });
             if (!meter) {
                 throw new Error(`Meter not found: ${meterId}`);
             }
-            const decoded = await this.decoderService.decode(meter.meterProfileId, technology, payload);
+            if (!meter.activeDevice) {
+                throw new Error(`Meter ${meterId} has no active device`);
+            }
+            const decoderFunction = meter.activeDevice.deviceProfile.decoderFunction;
+            const decoded = await this.decoderService.decodeWithFunction(decoderFunction || '', payload);
             const previousValue = meter.lastReadingValue
                 ? Number(meter.lastReadingValue)
                 : Number(meter.initialIndex);
@@ -70,7 +87,7 @@ let ReadingsProcessor = ReadingsProcessor_1 = class ReadingsProcessor extends bu
                 jobId: job.id,
                 data: job.data,
                 decoded: { ...decoded, consumption },
-                meterProfile: meter.meterProfileId,
+                deviceProfileId: meter.activeDevice.deviceProfileId,
             });
             if (this.readingBuffer.length >= this.BUFFER_SIZE) {
                 await this.flushBuffer();
@@ -117,21 +134,30 @@ let ReadingsProcessor = ReadingsProcessor_1 = class ReadingsProcessor extends bu
                 temperature: item.decoded.temperature,
                 raw_payload: { payload: item.data.payload, ...item.decoded.raw },
                 source: item.data.technology,
-                source_device_id: item.data.deviceId,
+                source_device_id: item.data.internalDeviceId || item.data.deviceId,
                 communication_technology: item.data.technology,
-                decoder_used: item.meterProfile,
+                decoder_used: item.deviceProfileId,
             }));
             await this.kysely.bulkInsertReadings(readings);
             const meterUpdates = new Map();
+            const deviceUpdates = new Map();
             for (const item of itemsToFlush) {
-                const existing = meterUpdates.get(item.data.meterId);
-                if (!existing || item.data.timestamp > existing.time) {
+                const existingMeter = meterUpdates.get(item.data.meterId);
+                if (!existingMeter || item.data.timestamp > existingMeter.time) {
                     meterUpdates.set(item.data.meterId, {
                         value: item.decoded.value,
                         time: item.data.timestamp,
-                        signal: item.decoded.signalStrength,
-                        battery: item.decoded.batteryLevel,
                     });
+                }
+                if (item.data.internalDeviceId) {
+                    const existingDevice = deviceUpdates.get(item.data.internalDeviceId);
+                    if (!existingDevice || item.data.timestamp > existingDevice.time) {
+                        deviceUpdates.set(item.data.internalDeviceId, {
+                            signal: item.decoded.signalStrength,
+                            battery: item.decoded.batteryLevel,
+                            time: item.data.timestamp,
+                        });
+                    }
                 }
             }
             await Promise.all(Array.from(meterUpdates.entries()).map(([meterId, update]) => this.prisma.meter.update({
@@ -139,8 +165,14 @@ let ReadingsProcessor = ReadingsProcessor_1 = class ReadingsProcessor extends bu
                 data: {
                     lastReadingValue: update.value,
                     lastReadingTime: update.time,
+                },
+            })));
+            await Promise.all(Array.from(deviceUpdates.entries()).map(([deviceId, update]) => this.prisma.device.update({
+                where: { id: deviceId },
+                data: {
                     lastSignalStrength: update.signal,
                     lastBatteryLevel: update.battery,
+                    lastCommunicationAt: update.time,
                 },
             })));
             await this.emitReadingEvents(itemsToFlush);
@@ -163,6 +195,7 @@ let ReadingsProcessor = ReadingsProcessor_1 = class ReadingsProcessor extends bu
             byTenant.get(tenantId).push({
                 meterId: item.data.meterId,
                 deviceId: item.data.deviceId,
+                internalDeviceId: item.data.internalDeviceId,
                 value: item.decoded.value,
                 consumption: item.decoded.consumption,
                 timestamp: item.data.timestamp,

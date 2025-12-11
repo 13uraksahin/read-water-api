@@ -42,6 +42,7 @@ export interface ReadingJobData {
     tenantId: string;
     meterId?: string;
     deviceId: string;
+    internalDeviceId?: string;
     technology: string;
     payload: string;
     timestamp: Date;
@@ -81,19 +82,12 @@ export interface TechFieldDefinition {
     required: boolean;
     description?: string;
 }
-export interface ConnectivityConfig {
-    primary?: {
-        technology: string;
-        fields: Record<string, string>;
-    };
-    secondary?: {
-        technology: string;
-        fields: Record<string, string>;
-    };
-    others?: Array<{
-        technology: string;
-        fields: Record<string, string>;
-    }>;
+export interface DeviceLookupResult {
+    deviceId: string;
+    tenantId: string;
+    meterId: string | null;
+    deviceProfileId: string;
+    decoderFunction: string | null;
 }
 export interface IndividualCustomerDetails {
     firstName: string;

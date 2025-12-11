@@ -7,7 +7,8 @@ export declare class DecoderService {
     private readonly logger;
     private decoderCache;
     constructor(prisma: PrismaService, redisService: RedisService);
-    decode(profileId: string, technology: string, payload: string): Promise<DecodedReading>;
+    decode(deviceProfileId: string, payload: string): Promise<DecodedReading>;
+    decodeWithFunction(decoderCode: string, payload: string): Promise<DecodedReading>;
     private getDecoderFunction;
     private executeDecoder;
     private defaultDecode;

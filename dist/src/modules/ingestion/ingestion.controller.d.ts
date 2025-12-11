@@ -10,7 +10,8 @@ export declare class IngestionController {
     }>;
     ingestBatch(dto: IngestBatchDto): Promise<{
         jobIds: string[];
-        status: string;
+        queued: number;
+        skipped: number;
     }>;
     lorawanUplink(dto: LoRaWANUplinkDto): Promise<{
         jobId: string;

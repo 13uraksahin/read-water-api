@@ -12,10 +12,15 @@ async function bootstrap() {
     });
     const configService = app.get(config_1.ConfigService);
     app.setGlobalPrefix('api/v1');
+    const corsOriginsStr = configService.get('CORS_ORIGINS', 'http://localhost:3000,https://read-water-app.portall.com.tr');
+    const corsOrigins = corsOriginsStr.split(',').map((origin) => origin.trim());
+    logger.log(`📡 CORS enabled for origins: ${corsOrigins.join(', ')}`);
     app.enableCors({
-        origin: configService.get('CORS_ORIGINS', 'http://localhost:3000').split(','),
+        origin: corsOrigins,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+        exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Page-Size'],
     });
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,

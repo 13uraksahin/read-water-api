@@ -10,24 +10,14 @@ declare class AddressDto {
     postalCode?: string;
     extraDetails?: string;
 }
-declare class ConnectivityFieldsDto {
-    technology: string;
-    fields: Record<string, string>;
-}
-declare class ConnectivityConfigDto {
-    primary?: ConnectivityFieldsDto;
-    secondary?: ConnectivityFieldsDto;
-    others?: ConnectivityFieldsDto[];
-}
 export declare class CreateMeterDto {
     tenantId: string;
-    customerId?: string;
+    customerId: string;
     meterProfileId: string;
     serialNumber: string;
     initialIndex?: number;
     installationDate: string;
     status?: MeterStatus;
-    connectivityConfig?: ConnectivityConfigDto;
     address: AddressDto;
     addressCode?: string;
     latitude?: number;
@@ -40,7 +30,6 @@ export declare class UpdateMeterDto {
     serialNumber?: string;
     status?: MeterStatus;
     valveStatus?: ValveStatus;
-    connectivityConfig?: ConnectivityConfigDto;
     address?: AddressDto;
     addressCode?: string;
     latitude?: number;
@@ -60,5 +49,11 @@ export declare class MeterQueryDto {
 }
 export declare class ControlValveDto {
     action: 'OPEN' | 'CLOSED';
+}
+export declare class LinkDeviceDto {
+    deviceId: string;
+}
+export declare class UnlinkDeviceDto {
+    deviceStatus?: 'WAREHOUSE' | 'MAINTENANCE';
 }
 export {};

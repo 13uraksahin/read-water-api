@@ -1,5 +1,7 @@
 // =============================================================================
-// Meters Controller
+// Meters Controller - Refactored for Asset/Device Split
+// =============================================================================
+// Added: Link/Unlink device endpoints
 // =============================================================================
 
 import {
@@ -17,7 +19,14 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { MetersService } from './meters.service';
-import { CreateMeterDto, UpdateMeterDto, MeterQueryDto, ControlValveDto } from './dto/meter.dto';
+import {
+  CreateMeterDto,
+  UpdateMeterDto,
+  MeterQueryDto,
+  ControlValveDto,
+  LinkDeviceDto,
+  UnlinkDeviceDto,
+} from './dto/meter.dto';
 import { JwtAuthGuard } from '../../iam/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../iam/auth/guards/permissions.guard';
 import { CurrentUser, RequirePermissions } from '../../../common/decorators';
@@ -76,6 +85,42 @@ export class MetersController {
     return this.metersService.update(id, dto, user);
   }
 
+  // ==========================================================================
+  // DEVICE LINK/UNLINK ENDPOINTS
+  // ==========================================================================
+
+  /**
+   * Link a device to a meter
+   * Device must be in WAREHOUSE status
+   */
+  @Post(':id/link-device')
+  @RequirePermissions(PERMISSIONS.METER_UPDATE)
+  async linkDevice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LinkDeviceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.linkDevice(id, dto, user);
+  }
+
+  /**
+   * Unlink a device from a meter
+   * Device status will be set to WAREHOUSE or MAINTENANCE
+   */
+  @Post(':id/unlink-device')
+  @RequirePermissions(PERMISSIONS.METER_UPDATE)
+  async unlinkDevice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UnlinkDeviceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.unlinkDevice(id, dto, user);
+  }
+
+  // ==========================================================================
+  // VALVE CONTROL
+  // ==========================================================================
+
   @Post(':id/valve')
   @RequirePermissions(PERMISSIONS.VALVE_CONTROL)
   async controlValve(
@@ -96,4 +141,3 @@ export class MetersController {
     await this.metersService.delete(id, user);
   }
 }
-

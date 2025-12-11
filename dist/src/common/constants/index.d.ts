@@ -11,6 +11,9 @@ export declare const SOCKET_EVENTS: {
     readonly ALARM_RESOLVED: "alarm:resolved";
     readonly METER_STATUS_CHANGED: "meter:status-changed";
     readonly METER_VALVE_CHANGED: "meter:valve-changed";
+    readonly DEVICE_STATUS_CHANGED: "device:status-changed";
+    readonly DEVICE_LINKED: "device:linked";
+    readonly DEVICE_UNLINKED: "device:unlinked";
     readonly DASHBOARD_UPDATE: "dashboard:update";
     readonly CLIENT_CONNECTED: "client:connected";
     readonly CLIENT_DISCONNECTED: "client:disconnected";
@@ -21,7 +24,9 @@ export declare const CACHE_KEYS: {
     readonly USER_SESSION: (userId: string) => string;
     readonly TENANT_SETTINGS: (tenantId: string) => string;
     readonly METER_PROFILE: (profileId: string) => string;
+    readonly DEVICE_PROFILE: (profileId: string) => string;
     readonly DECODER_FUNCTION: (decoderId: string) => string;
+    readonly DEVICE_LOOKUP: (technology: string, deviceId: string) => string;
     readonly RATE_LIMIT: (key: string) => string;
 };
 export declare const CACHE_TTL: {
@@ -56,6 +61,10 @@ export declare const PERMISSIONS: {
     readonly METER_READ: "meter.read";
     readonly METER_UPDATE: "meter.update";
     readonly METER_DELETE: "meter.delete";
+    readonly DEVICE_CREATE: "device.create";
+    readonly DEVICE_READ: "device.read";
+    readonly DEVICE_UPDATE: "device.update";
+    readonly DEVICE_DELETE: "device.delete";
     readonly READING_READ: "reading.read";
     readonly READING_EXPORT: "reading.export";
     readonly VALVE_CONTROL: "valve.control";

@@ -13,26 +13,6 @@ exports.ProfileQueryDto = exports.UpdateMeterProfileDto = exports.CreateMeterPro
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
-class CommunicationConfigDto {
-    technology;
-    fields;
-    decoder;
-}
-__decorate([
-    (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
-    (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
-], CommunicationConfigDto.prototype, "technology", void 0);
-__decorate([
-    (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Array)
-], CommunicationConfigDto.prototype, "fields", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], CommunicationConfigDto.prototype, "decoder", void 0);
 class CreateMeterProfileDto {
     brand;
     modelCode;
@@ -53,8 +33,7 @@ class CreateMeterProfileDto {
     pressureLoss;
     ipRating;
     communicationModule;
-    batteryLifeMonths;
-    communicationConfigs;
+    compatibleDeviceProfileIds;
     specifications;
 }
 exports.CreateMeterProfileDto = CreateMeterProfileDto;
@@ -96,51 +75,61 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "diameter", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "length", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "width", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "height", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "q1", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "q2", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "q3", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "q4", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "rValue", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterProfileDto.prototype, "pressureLoss", void 0);
 __decorate([
@@ -154,17 +143,11 @@ __decorate([
     __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "communicationModule", void 0);
 __decorate([
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number)
-], CreateMeterProfileDto.prototype, "batteryLifeMonths", void 0);
-__decorate([
-    (0, class_validator_1.ValidateNested)({ each: true }),
-    (0, class_transformer_1.Type)(() => CommunicationConfigDto),
     (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
-], CreateMeterProfileDto.prototype, "communicationConfigs", void 0);
+], CreateMeterProfileDto.prototype, "compatibleDeviceProfileIds", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.IsOptional)(),
@@ -189,8 +172,7 @@ class UpdateMeterProfileDto {
     pressureLoss;
     ipRating;
     communicationModule;
-    batteryLifeMonths;
-    communicationConfigs;
+    compatibleDeviceProfileIds;
     specifications;
 }
 exports.UpdateMeterProfileDto = UpdateMeterProfileDto;
@@ -227,51 +209,61 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "diameter", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "length", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "width", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "height", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "q1", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "q2", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "q3", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "q4", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "rValue", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterProfileDto.prototype, "pressureLoss", void 0);
 __decorate([
@@ -285,17 +277,11 @@ __decorate([
     __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "communicationModule", void 0);
 __decorate([
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number)
-], UpdateMeterProfileDto.prototype, "batteryLifeMonths", void 0);
-__decorate([
-    (0, class_validator_1.ValidateNested)({ each: true }),
-    (0, class_transformer_1.Type)(() => CommunicationConfigDto),
     (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
-], UpdateMeterProfileDto.prototype, "communicationConfigs", void 0);
+], UpdateMeterProfileDto.prototype, "compatibleDeviceProfileIds", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.IsOptional)(),
@@ -314,11 +300,13 @@ exports.ProfileQueryDto = ProfileQueryDto;
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], ProfileQueryDto.prototype, "page", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], ProfileQueryDto.prototype, "limit", void 0);
 __decorate([

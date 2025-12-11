@@ -24,6 +24,11 @@ export const SOCKET_EVENTS = {
   METER_STATUS_CHANGED: 'meter:status-changed',
   METER_VALVE_CHANGED: 'meter:valve-changed',
   
+  // Device events
+  DEVICE_STATUS_CHANGED: 'device:status-changed',
+  DEVICE_LINKED: 'device:linked',
+  DEVICE_UNLINKED: 'device:unlinked',
+  
   // Dashboard events
   DASHBOARD_UPDATE: 'dashboard:update',
   
@@ -41,7 +46,9 @@ export const CACHE_KEYS = {
   USER_SESSION: (userId: string) => `session:${userId}`,
   TENANT_SETTINGS: (tenantId: string) => `tenant:${tenantId}:settings`,
   METER_PROFILE: (profileId: string) => `profile:${profileId}`,
+  DEVICE_PROFILE: (profileId: string) => `device-profile:${profileId}`,
   DECODER_FUNCTION: (decoderId: string) => `decoder:${decoderId}`,
+  DEVICE_LOOKUP: (technology: string, deviceId: string) => `device:${technology}:${deviceId}`,
   RATE_LIMIT: (key: string) => `ratelimit:${key}`,
 } as const;
 
@@ -84,6 +91,12 @@ export const PERMISSIONS = {
   METER_READ: 'meter.read',
   METER_UPDATE: 'meter.update',
   METER_DELETE: 'meter.delete',
+  // Device permissions
+  DEVICE_CREATE: 'device.create',
+  DEVICE_READ: 'device.read',
+  DEVICE_UPDATE: 'device.update',
+  DEVICE_DELETE: 'device.delete',
+  // Reading permissions
   READING_READ: 'reading.read',
   READING_EXPORT: 'reading.export',
   VALVE_CONTROL: 'valve.control',
@@ -113,6 +126,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.METER_READ,
     PERMISSIONS.METER_UPDATE,
     PERMISSIONS.METER_DELETE,
+    PERMISSIONS.DEVICE_CREATE,
+    PERMISSIONS.DEVICE_READ,
+    PERMISSIONS.DEVICE_UPDATE,
+    PERMISSIONS.DEVICE_DELETE,
     PERMISSIONS.READING_READ,
     PERMISSIONS.READING_EXPORT,
     PERMISSIONS.VALVE_CONTROL,
@@ -128,6 +145,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.METER_CREATE,
     PERMISSIONS.METER_READ,
     PERMISSIONS.METER_UPDATE,
+    PERMISSIONS.DEVICE_CREATE,
+    PERMISSIONS.DEVICE_READ,
+    PERMISSIONS.DEVICE_UPDATE,
     PERMISSIONS.READING_READ,
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_READ,
@@ -137,6 +157,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.TENANT_READ,
     PERMISSIONS.USER_READ,
     PERMISSIONS.METER_READ,
+    PERMISSIONS.DEVICE_READ,
     PERMISSIONS.READING_READ,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.PROFILE_READ,
@@ -144,6 +165,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   [SYSTEM_ROLES.FIELD_ENGINEER]: [
     PERMISSIONS.METER_READ,
     PERMISSIONS.METER_UPDATE,
+    PERMISSIONS.DEVICE_READ,
+    PERMISSIONS.DEVICE_UPDATE,
     PERMISSIONS.READING_READ,
   ],
   [SYSTEM_ROLES.CUSTOMER]: [
@@ -151,4 +174,3 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.METER_READ,
   ],
 };
-

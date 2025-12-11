@@ -10,6 +10,7 @@ export declare class ProfilesController {
         length: number | null;
         brand: import("@prisma/client").$Enums.Brand;
         modelCode: string;
+        specifications: import("@prisma/client/runtime/library").JsonValue | null;
         meterType: import("@prisma/client").$Enums.MeterType;
         dialType: import("@prisma/client").$Enums.DialType;
         connectionType: import("@prisma/client").$Enums.ConnectionType;
@@ -26,9 +27,6 @@ export declare class ProfilesController {
         pressureLoss: import("@prisma/client/runtime/library").Decimal | null;
         ipRating: import("@prisma/client").$Enums.IPRating | null;
         communicationModule: import("@prisma/client").$Enums.CommunicationModule;
-        batteryLifeMonths: number | null;
-        communicationConfigs: import("@prisma/client/runtime/library").JsonValue[];
-        specifications: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     findAll(query: ProfileQueryDto): Promise<import("../../../common/interfaces").PaginatedResult<{
         id: string;
@@ -37,6 +35,7 @@ export declare class ProfilesController {
         length: number | null;
         brand: import("@prisma/client").$Enums.Brand;
         modelCode: string;
+        specifications: import("@prisma/client/runtime/library").JsonValue | null;
         meterType: import("@prisma/client").$Enums.MeterType;
         dialType: import("@prisma/client").$Enums.DialType;
         connectionType: import("@prisma/client").$Enums.ConnectionType;
@@ -53,9 +52,6 @@ export declare class ProfilesController {
         pressureLoss: import("@prisma/client/runtime/library").Decimal | null;
         ipRating: import("@prisma/client").$Enums.IPRating | null;
         communicationModule: import("@prisma/client").$Enums.CommunicationModule;
-        batteryLifeMonths: number | null;
-        communicationConfigs: import("@prisma/client/runtime/library").JsonValue[];
-        specifications: import("@prisma/client/runtime/library").JsonValue | null;
     }>>;
     getCommunicationTechFields(): Promise<{
         id: string;
@@ -72,6 +68,7 @@ export declare class ProfilesController {
         length: number | null;
         brand: import("@prisma/client").$Enums.Brand;
         modelCode: string;
+        specifications: import("@prisma/client/runtime/library").JsonValue | null;
         meterType: import("@prisma/client").$Enums.MeterType;
         dialType: import("@prisma/client").$Enums.DialType;
         connectionType: import("@prisma/client").$Enums.ConnectionType;
@@ -88,9 +85,6 @@ export declare class ProfilesController {
         pressureLoss: import("@prisma/client/runtime/library").Decimal | null;
         ipRating: import("@prisma/client").$Enums.IPRating | null;
         communicationModule: import("@prisma/client").$Enums.CommunicationModule;
-        batteryLifeMonths: number | null;
-        communicationConfigs: import("@prisma/client/runtime/library").JsonValue[];
-        specifications: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     update(id: string, dto: UpdateMeterProfileDto): Promise<{
         id: string;
@@ -99,6 +93,7 @@ export declare class ProfilesController {
         length: number | null;
         brand: import("@prisma/client").$Enums.Brand;
         modelCode: string;
+        specifications: import("@prisma/client/runtime/library").JsonValue | null;
         meterType: import("@prisma/client").$Enums.MeterType;
         dialType: import("@prisma/client").$Enums.DialType;
         connectionType: import("@prisma/client").$Enums.ConnectionType;
@@ -115,9 +110,6 @@ export declare class ProfilesController {
         pressureLoss: import("@prisma/client/runtime/library").Decimal | null;
         ipRating: import("@prisma/client").$Enums.IPRating | null;
         communicationModule: import("@prisma/client").$Enums.CommunicationModule;
-        batteryLifeMonths: number | null;
-        communicationConfigs: import("@prisma/client/runtime/library").JsonValue[];
-        specifications: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
     delete(id: string): Promise<void>;
 }

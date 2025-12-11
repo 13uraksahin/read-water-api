@@ -1,5 +1,7 @@
 // =============================================================================
-// Meter Profile DTOs
+// Meter Profile DTOs - Refactored for Asset/Device Split
+// =============================================================================
+// REMOVED: communicationConfigs, batteryLifeMonths (now in DeviceProfile)
 // =============================================================================
 
 import {
@@ -8,11 +10,11 @@ import {
   IsOptional,
   IsEnum,
   IsNumber,
-  IsArray,
   IsObject,
-  ValidateNested,
+  IsUUID,
+  IsArray,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   Brand,
   MeterType,
@@ -22,30 +24,7 @@ import {
   TemperatureType,
   IPRating,
   CommunicationModule,
-  CommunicationTechnology,
 } from '@prisma/client';
-
-class CommunicationConfigDto {
-  @IsEnum(CommunicationTechnology)
-  @IsNotEmpty()
-  technology: CommunicationTechnology;
-
-  @IsArray()
-  @IsOptional()
-  fields?: Array<{
-    name: string;
-    label: string;
-    type: string;
-    length?: number;
-    regex?: string;
-    required: boolean;
-    description?: string;
-  }>;
-
-  @IsString()
-  @IsOptional()
-  decoder?: string; // JS decoder function code
-}
 
 export class CreateMeterProfileDto {
   @IsEnum(Brand)
@@ -78,42 +57,52 @@ export class CreateMeterProfileDto {
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   diameter?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   length?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   width?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   height?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q1?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q2?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q3?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q4?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   rValue?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   pressureLoss?: number;
 
   @IsEnum(IPRating)
@@ -124,15 +113,11 @@ export class CreateMeterProfileDto {
   @IsOptional()
   communicationModule?: CommunicationModule;
 
-  @IsNumber()
-  @IsOptional()
-  batteryLifeMonths?: number;
-
-  @ValidateNested({ each: true })
-  @Type(() => CommunicationConfigDto)
+  // Compatible device profile IDs
   @IsArray()
+  @IsUUID('4', { each: true })
   @IsOptional()
-  communicationConfigs?: CommunicationConfigDto[];
+  compatibleDeviceProfileIds?: string[];
 
   @IsObject()
   @IsOptional()
@@ -166,42 +151,52 @@ export class UpdateMeterProfileDto {
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   diameter?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   length?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   width?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   height?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q1?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q2?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q3?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   q4?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   rValue?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   pressureLoss?: number;
 
   @IsEnum(IPRating)
@@ -212,15 +207,11 @@ export class UpdateMeterProfileDto {
   @IsOptional()
   communicationModule?: CommunicationModule;
 
-  @IsNumber()
-  @IsOptional()
-  batteryLifeMonths?: number;
-
-  @ValidateNested({ each: true })
-  @Type(() => CommunicationConfigDto)
+  // Compatible device profile IDs
   @IsArray()
+  @IsUUID('4', { each: true })
   @IsOptional()
-  communicationConfigs?: CommunicationConfigDto[];
+  compatibleDeviceProfileIds?: string[];
 
   @IsObject()
   @IsOptional()
@@ -230,10 +221,12 @@ export class UpdateMeterProfileDto {
 export class ProfileQueryDto {
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   page?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   limit?: number;
 
   @IsEnum(Brand)
@@ -256,4 +249,3 @@ export class ProfileQueryDto {
   @IsOptional()
   sortOrder?: 'asc' | 'desc';
 }
-

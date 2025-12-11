@@ -1,5 +1,7 @@
 // =============================================================================
-// Decoders Service
+// Decoders Service - Refactored for Asset/Device Split
+// =============================================================================
+// NOW: Decoder functions are stored in DeviceProfile, not separate model
 // =============================================================================
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -13,18 +15,16 @@ export interface DecoderData {
   description: string | null;
   technology: string;
   functionCode: string;
-  version: number;
-  isActive: boolean;
   testPayload: string | null;
   expectedOutput: Record<string, unknown> | null;
   lastTestedAt: Date | null;
   lastTestSucceeded: boolean | null;
-  profileId: string | null;
-  profile: {
+  deviceProfileId: string;
+  deviceProfile: {
     id: string;
     brand: string;
     modelCode: string;
-  } | null;
+  };
 }
 
 export interface PaginatedDecoders {
@@ -41,7 +41,7 @@ export interface DecodersQueryParams {
   page?: number;
   limit?: number;
   technology?: string;
-  isActive?: boolean;
+  brand?: string;
 }
 
 @Injectable()
@@ -51,66 +51,74 @@ export class DecodersService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Get paginated decoders
+   * Get paginated decoders from DeviceProfiles
+   * Decoders are now stored in DeviceProfile.decoderFunction
    */
   async getDecoders(params: DecodersQueryParams): Promise<PaginatedDecoders> {
     const page = params.page ?? 1;
     const limit = Math.min(params.limit ?? 30, 100);
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {
+      decoderFunction: { not: null }, // Only profiles with decoder functions
+    };
 
     if (params.technology) {
       where.communicationTechnology = params.technology;
     }
 
-    if (params.isActive !== undefined) {
-      where.isActive = params.isActive;
+    if (params.brand) {
+      where.brand = params.brand;
     }
 
-    const [total, decoders] = await Promise.all([
-      this.prisma.decoderFunction.count({ where }),
-      this.prisma.decoderFunction.findMany({
+    const [total, deviceProfiles] = await Promise.all([
+      this.prisma.deviceProfile.count({ where }),
+      this.prisma.deviceProfile.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
+        select: {
+          id: true,
+          createdAt: true,
+          updatedAt: true,
+          brand: true,
+          modelCode: true,
+          communicationTechnology: true,
+          decoderFunction: true,
+          testPayload: true,
+          expectedOutput: true,
+          lastTestedAt: true,
+          lastTestSucceeded: true,
+        },
       }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
 
-    // Get associated profiles from metadata
-    const decodersWithProfiles = await Promise.all(
-      decoders.map(async (d) => {
-        const metadata = d.metadata as Record<string, unknown> | null;
-        const profileId = metadata?.profileId as string | undefined;
-        
-        let profile = null;
-        if (profileId) {
-          const foundProfile = await this.prisma.meterProfile.findUnique({
-            where: { id: profileId },
-            select: {
-              id: true,
-              brand: true,
-              modelCode: true,
-            },
-          });
-          if (foundProfile) {
-            profile = {
-              id: foundProfile.id,
-              brand: foundProfile.brand,
-              modelCode: foundProfile.modelCode,
-            };
-          }
-        }
-
-        return this.mapDecoder(d, profileId || null, profile);
-      }),
-    );
+    // Map device profiles to decoder format
+    const decoders = deviceProfiles.map((dp): DecoderData => ({
+      id: dp.id,
+      createdAt: dp.createdAt,
+      updatedAt: dp.updatedAt,
+      name: `${dp.brand} ${dp.modelCode} Decoder`,
+      description: `Decoder for ${dp.brand} ${dp.modelCode} (${dp.communicationTechnology})`,
+      technology: dp.communicationTechnology,
+      functionCode: dp.decoderFunction || '',
+      testPayload: dp.testPayload,
+      expectedOutput: dp.expectedOutput as Record<string, unknown> | null,
+      lastTestedAt: dp.lastTestedAt,
+      lastTestSucceeded: dp.lastTestSucceeded,
+      deviceProfileId: dp.id,
+      deviceProfile: {
+        id: dp.id,
+        brand: dp.brand,
+        modelCode: dp.modelCode,
+      },
+    }));
 
     return {
-      data: decodersWithProfiles,
+      data: decoders,
       meta: {
         page,
         limit,
@@ -120,27 +128,49 @@ export class DecodersService {
     };
   }
 
-  private mapDecoder(
-    decoder: any,
-    profileId: string | null,
-    profile: { id: string; brand: string; modelCode: string } | null,
-  ): DecoderData {
+  /**
+   * Get a single decoder by device profile ID
+   */
+  async getDecoder(deviceProfileId: string): Promise<DecoderData | null> {
+    const dp = await this.prisma.deviceProfile.findUnique({
+      where: { id: deviceProfileId },
+      select: {
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        brand: true,
+        modelCode: true,
+        communicationTechnology: true,
+        decoderFunction: true,
+        testPayload: true,
+        expectedOutput: true,
+        lastTestedAt: true,
+        lastTestSucceeded: true,
+      },
+    });
+
+    if (!dp || !dp.decoderFunction) {
+      return null;
+    }
+
     return {
-      id: decoder.id,
-      createdAt: decoder.createdAt,
-      updatedAt: decoder.updatedAt,
-      name: decoder.name,
-      description: decoder.description,
-      technology: decoder.communicationTechnology,
-      functionCode: decoder.code,
-      version: decoder.version,
-      isActive: decoder.isActive,
-      testPayload: decoder.testPayload,
-      expectedOutput: decoder.expectedOutput as Record<string, unknown> | null,
-      lastTestedAt: decoder.lastTestedAt,
-      lastTestSucceeded: decoder.lastTestSucceeded,
-      profileId,
-      profile,
+      id: dp.id,
+      createdAt: dp.createdAt,
+      updatedAt: dp.updatedAt,
+      name: `${dp.brand} ${dp.modelCode} Decoder`,
+      description: `Decoder for ${dp.brand} ${dp.modelCode} (${dp.communicationTechnology})`,
+      technology: dp.communicationTechnology,
+      functionCode: dp.decoderFunction,
+      testPayload: dp.testPayload,
+      expectedOutput: dp.expectedOutput as Record<string, unknown> | null,
+      lastTestedAt: dp.lastTestedAt,
+      lastTestSucceeded: dp.lastTestSucceeded,
+      deviceProfileId: dp.id,
+      deviceProfile: {
+        id: dp.id,
+        brand: dp.brand,
+        modelCode: dp.modelCode,
+      },
     };
   }
 }

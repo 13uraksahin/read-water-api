@@ -1,16 +1,20 @@
 // =============================================================================
-// Ingestion Service - High-Performance Reading Intake
+// Ingestion Service - Refactored for Asset/Device Split
 // =============================================================================
-// CRITICAL: This service ONLY validates and queues jobs. NO processing here.
-// All actual processing happens in the Worker module.
+// NEW FLOW:
+// 1. Receive payload with device identifier (DevEUI, Sigfox ID, IMEI, etc.)
+// 2. Lookup Device by dynamic_fields (NOT Meter's connectivity_config)
+// 3. Check if Device has an active meter linked
+// 4. Queue job with device and meter info
 // =============================================================================
 
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { QUEUES } from '../../common/constants';
-import { ReadingJobData } from '../../common/interfaces';
+import { RedisService } from '../../core/redis/redis.service';
+import { QUEUES, CACHE_KEYS, CACHE_TTL } from '../../common/constants';
+import { ReadingJobData, DeviceLookupResult } from '../../common/interfaces';
 import {
   IngestReadingDto,
   IngestBatchDto,
@@ -23,13 +27,10 @@ import { CommunicationTechnology } from '@prisma/client';
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
 
-  // Cache for device->tenant mapping (reduce DB lookups)
-  private deviceTenantCache = new Map<string, { tenantId: string; meterId: string; expiresAt: number }>();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
   constructor(
     @InjectQueue(QUEUES.READINGS) private readonly readingsQueue: Queue,
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -39,14 +40,25 @@ export class IngestionService {
   async ingestReading(dto: IngestReadingDto): Promise<{ jobId: string; status: string }> {
     const timestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
 
-    // Lookup meter and tenant (with caching)
-    const { tenantId, meterId } = await this.resolveDevice(dto.deviceId, dto.technology);
+    // NEW FLOW: Lookup Device (not Meter) by device identifier
+    const deviceLookup = await this.resolveDevice(dto.deviceId, dto.technology);
+
+    // Check if device has a linked meter
+    if (!deviceLookup.meterId) {
+      this.logger.warn(
+        `Device ${dto.deviceId} (${dto.technology}) has no linked meter - ignoring payload`,
+      );
+      throw new BadRequestException(
+        `Device ${dto.deviceId} has no linked meter. Please link it to a meter first.`,
+      );
+    }
 
     // Create job data
     const jobData: ReadingJobData = {
-      tenantId,
-      meterId,
+      tenantId: deviceLookup.tenantId,
+      meterId: deviceLookup.meterId,
       deviceId: dto.deviceId,
+      internalDeviceId: deviceLookup.deviceId,
       technology: dto.technology,
       payload: dto.payload,
       timestamp,
@@ -84,8 +96,9 @@ export class IngestionService {
   /**
    * Ingest a batch of readings - For efficiency
    */
-  async ingestBatch(dto: IngestBatchDto): Promise<{ jobIds: string[]; status: string }> {
+  async ingestBatch(dto: IngestBatchDto): Promise<{ jobIds: string[]; queued: number; skipped: number }> {
     const jobIds: string[] = [];
+    let skipped = 0;
 
     // Process in chunks to avoid memory issues
     const chunkSize = 100;
@@ -94,37 +107,54 @@ export class IngestionService {
 
       const jobs = await Promise.all(
         chunk.map(async (reading) => {
-          const timestamp = reading.timestamp ? new Date(reading.timestamp) : new Date();
-          const { tenantId, meterId } = await this.resolveDevice(
-            reading.deviceId,
-            reading.technology,
-          );
+          try {
+            const timestamp = reading.timestamp ? new Date(reading.timestamp) : new Date();
+            const deviceLookup = await this.resolveDevice(
+              reading.deviceId,
+              reading.technology,
+            );
 
-          const jobData: ReadingJobData = {
-            tenantId: dto.tenantId || tenantId,
-            meterId,
-            deviceId: reading.deviceId,
-            technology: reading.technology,
-            payload: reading.payload,
-            timestamp,
-            metadata: reading.metadata,
-          };
+            // Skip if no linked meter
+            if (!deviceLookup.meterId) {
+              this.logger.debug(`Skipping device ${reading.deviceId} - no linked meter`);
+              skipped++;
+              return null;
+            }
 
-          return this.readingsQueue.add('process-reading', jobData, {
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 1000 },
-          });
+            const jobData: ReadingJobData = {
+              tenantId: dto.tenantId || deviceLookup.tenantId,
+              meterId: deviceLookup.meterId,
+              deviceId: reading.deviceId,
+              internalDeviceId: deviceLookup.deviceId,
+              technology: reading.technology,
+              payload: reading.payload,
+              timestamp,
+              metadata: reading.metadata,
+            };
+
+            return this.readingsQueue.add('process-reading', jobData, {
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 1000 },
+            });
+          } catch (error) {
+            this.logger.debug(`Skipping reading: ${error.message}`);
+            skipped++;
+            return null;
+          }
         }),
       );
 
-      jobIds.push(...jobs.map((j) => j.id!));
+      jobIds.push(
+        ...jobs.filter((j) => j !== null).map((j) => j!.id!),
+      );
     }
 
-    this.logger.log(`Queued ${jobIds.length} readings in batch`);
+    this.logger.log(`Queued ${jobIds.length} readings, skipped ${skipped}`);
 
     return {
       jobIds,
-      status: 'queued',
+      queued: jobIds.length,
+      skipped,
     };
   }
 
@@ -186,77 +216,69 @@ export class IngestionService {
   }
 
   /**
-   * Resolve device ID to tenant and meter
-   * Uses caching to reduce DB lookups
+   * NEW: Resolve device identifier to Device entity
+   * Uses caching and looks up by dynamic_fields in the devices table
    */
   private async resolveDevice(
     deviceId: string,
     technology: string,
-  ): Promise<{ tenantId: string; meterId: string }> {
-    const cacheKey = `${technology}:${deviceId}`;
+  ): Promise<DeviceLookupResult> {
+    const cacheKey = CACHE_KEYS.DEVICE_LOOKUP(technology, deviceId);
 
-    // Check cache first
-    const cached = this.deviceTenantCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return { tenantId: cached.tenantId, meterId: cached.meterId };
+    // Check Redis cache first
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
     }
 
-    // Lookup in database - find meter by device ID in connectivity config
-    const meter = await this.prisma.meter.findFirst({
-      where: {
-        status: 'ACTIVE',
-        OR: [
-          // Check primary connectivity
-          {
-            connectivityConfig: {
-              path: ['primary', 'technology'],
-              equals: technology,
-            },
-          },
-          // Check secondary connectivity
-          {
-            connectivityConfig: {
-              path: ['secondary', 'technology'],
-              equals: technology,
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        tenantId: true,
-        connectivityConfig: true,
-      },
-    });
-
-    if (!meter) {
-      throw new BadRequestException(`Unknown device: ${deviceId} (${technology})`);
-    }
-
-    // Verify device ID matches
-    const config = meter.connectivityConfig as any;
+    // Get the device ID field name for this technology
     const deviceIdField = this.getDeviceIdField(technology);
+    const deviceIdLower = deviceId.toLowerCase();
 
-    const matchesPrimary =
-      config?.primary?.technology === technology &&
-      config?.primary?.fields?.[deviceIdField]?.toLowerCase() === deviceId.toLowerCase();
+    // Query devices table - search in dynamic_fields JSONB
+    const devices = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        tenant_id: string;
+        device_profile_id: string;
+        meter_id: string | null;
+        decoder_function: string | null;
+      }>
+    >`
+      SELECT 
+        d.id,
+        d.tenant_id,
+        d.device_profile_id,
+        m.id as meter_id,
+        dp.decoder_function
+      FROM devices d
+      LEFT JOIN meters m ON m.active_device_id = d.id
+      JOIN device_profiles dp ON d.device_profile_id = dp.id
+      WHERE d.status IN ('ACTIVE', 'DEPLOYED')
+        AND LOWER(d.dynamic_fields->>${deviceIdField}) = ${deviceIdLower}
+      LIMIT 1
+    `;
 
-    const matchesSecondary =
-      config?.secondary?.technology === technology &&
-      config?.secondary?.fields?.[deviceIdField]?.toLowerCase() === deviceId.toLowerCase();
-
-    if (!matchesPrimary && !matchesSecondary) {
-      throw new BadRequestException(`Device ${deviceId} not found for technology ${technology}`);
+    if (!devices || devices.length === 0) {
+      throw new NotFoundException(
+        `Device with ${deviceIdField}=${deviceId} not found for technology ${technology}`,
+      );
     }
 
-    // Cache result
-    this.deviceTenantCache.set(cacheKey, {
-      tenantId: meter.tenantId,
-      meterId: meter.id,
-      expiresAt: Date.now() + this.CACHE_TTL,
-    });
+    const device = devices[0];
 
-    return { tenantId: meter.tenantId, meterId: meter.id };
+    const result: DeviceLookupResult = {
+      deviceId: device.id,
+      tenantId: device.tenant_id,
+      meterId: device.meter_id,
+      deviceProfileId: device.device_profile_id,
+      decoderFunction: device.decoder_function,
+    };
+
+    // Cache result (shorter TTL for devices that might be linked/unlinked)
+    await this.redisService.set(cacheKey, JSON.stringify(result), CACHE_TTL.SHORT);
+
+    return result;
   }
 
   /**
@@ -286,11 +308,12 @@ export class IngestionService {
   }
 
   /**
-   * Clear device cache (for testing/admin)
+   * Clear device cache (for admin/testing)
    */
-  clearDeviceCache(): void {
-    this.deviceTenantCache.clear();
-    this.logger.log('Device cache cleared');
+  async clearDeviceCache(technology?: string, deviceId?: string): Promise<void> {
+    if (technology && deviceId) {
+      await this.redisService.del(CACHE_KEYS.DEVICE_LOOKUP(technology, deviceId));
+    }
+    this.logger.log('Device lookup cache cleared');
   }
 }
-

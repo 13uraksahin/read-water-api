@@ -23,48 +23,59 @@ let DecodersService = DecodersService_1 = class DecodersService {
         const page = params.page ?? 1;
         const limit = Math.min(params.limit ?? 30, 100);
         const skip = (page - 1) * limit;
-        const where = {};
+        const where = {
+            decoderFunction: { not: null },
+        };
         if (params.technology) {
             where.communicationTechnology = params.technology;
         }
-        if (params.isActive !== undefined) {
-            where.isActive = params.isActive;
+        if (params.brand) {
+            where.brand = params.brand;
         }
-        const [total, decoders] = await Promise.all([
-            this.prisma.decoderFunction.count({ where }),
-            this.prisma.decoderFunction.findMany({
+        const [total, deviceProfiles] = await Promise.all([
+            this.prisma.deviceProfile.count({ where }),
+            this.prisma.deviceProfile.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,
+                select: {
+                    id: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    brand: true,
+                    modelCode: true,
+                    communicationTechnology: true,
+                    decoderFunction: true,
+                    testPayload: true,
+                    expectedOutput: true,
+                    lastTestedAt: true,
+                    lastTestSucceeded: true,
+                },
             }),
         ]);
         const totalPages = Math.ceil(total / limit);
-        const decodersWithProfiles = await Promise.all(decoders.map(async (d) => {
-            const metadata = d.metadata;
-            const profileId = metadata?.profileId;
-            let profile = null;
-            if (profileId) {
-                const foundProfile = await this.prisma.meterProfile.findUnique({
-                    where: { id: profileId },
-                    select: {
-                        id: true,
-                        brand: true,
-                        modelCode: true,
-                    },
-                });
-                if (foundProfile) {
-                    profile = {
-                        id: foundProfile.id,
-                        brand: foundProfile.brand,
-                        modelCode: foundProfile.modelCode,
-                    };
-                }
-            }
-            return this.mapDecoder(d, profileId || null, profile);
+        const decoders = deviceProfiles.map((dp) => ({
+            id: dp.id,
+            createdAt: dp.createdAt,
+            updatedAt: dp.updatedAt,
+            name: `${dp.brand} ${dp.modelCode} Decoder`,
+            description: `Decoder for ${dp.brand} ${dp.modelCode} (${dp.communicationTechnology})`,
+            technology: dp.communicationTechnology,
+            functionCode: dp.decoderFunction || '',
+            testPayload: dp.testPayload,
+            expectedOutput: dp.expectedOutput,
+            lastTestedAt: dp.lastTestedAt,
+            lastTestSucceeded: dp.lastTestSucceeded,
+            deviceProfileId: dp.id,
+            deviceProfile: {
+                id: dp.id,
+                brand: dp.brand,
+                modelCode: dp.modelCode,
+            },
         }));
         return {
-            data: decodersWithProfiles,
+            data: decoders,
             meta: {
                 page,
                 limit,
@@ -73,23 +84,44 @@ let DecodersService = DecodersService_1 = class DecodersService {
             },
         };
     }
-    mapDecoder(decoder, profileId, profile) {
+    async getDecoder(deviceProfileId) {
+        const dp = await this.prisma.deviceProfile.findUnique({
+            where: { id: deviceProfileId },
+            select: {
+                id: true,
+                createdAt: true,
+                updatedAt: true,
+                brand: true,
+                modelCode: true,
+                communicationTechnology: true,
+                decoderFunction: true,
+                testPayload: true,
+                expectedOutput: true,
+                lastTestedAt: true,
+                lastTestSucceeded: true,
+            },
+        });
+        if (!dp || !dp.decoderFunction) {
+            return null;
+        }
         return {
-            id: decoder.id,
-            createdAt: decoder.createdAt,
-            updatedAt: decoder.updatedAt,
-            name: decoder.name,
-            description: decoder.description,
-            technology: decoder.communicationTechnology,
-            functionCode: decoder.code,
-            version: decoder.version,
-            isActive: decoder.isActive,
-            testPayload: decoder.testPayload,
-            expectedOutput: decoder.expectedOutput,
-            lastTestedAt: decoder.lastTestedAt,
-            lastTestSucceeded: decoder.lastTestSucceeded,
-            profileId,
-            profile,
+            id: dp.id,
+            createdAt: dp.createdAt,
+            updatedAt: dp.updatedAt,
+            name: `${dp.brand} ${dp.modelCode} Decoder`,
+            description: `Decoder for ${dp.brand} ${dp.modelCode} (${dp.communicationTechnology})`,
+            technology: dp.communicationTechnology,
+            functionCode: dp.decoderFunction,
+            testPayload: dp.testPayload,
+            expectedOutput: dp.expectedOutput,
+            lastTestedAt: dp.lastTestedAt,
+            lastTestSucceeded: dp.lastTestSucceeded,
+            deviceProfileId: dp.id,
+            deviceProfile: {
+                id: dp.id,
+                brand: dp.brand,
+                modelCode: dp.modelCode,
+            },
         };
     }
 };

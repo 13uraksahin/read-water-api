@@ -40,6 +40,12 @@ let MetersController = class MetersController {
     async update(id, dto, user) {
         return this.metersService.update(id, dto, user);
     }
+    async linkDevice(id, dto, user) {
+        return this.metersService.linkDevice(id, dto, user);
+    }
+    async unlinkDevice(id, dto, user) {
+        return this.metersService.unlinkDevice(id, dto, user);
+    }
     async controlValve(id, dto, user) {
         return this.metersService.controlValve(id, dto, user);
     }
@@ -95,6 +101,26 @@ __decorate([
     __metadata("design:paramtypes", [String, meter_dto_1.UpdateMeterDto, Object]),
     __metadata("design:returntype", Promise)
 ], MetersController.prototype, "update", null);
+__decorate([
+    (0, common_1.Post)(':id/link-device'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.METER_UPDATE),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, meter_dto_1.LinkDeviceDto, Object]),
+    __metadata("design:returntype", Promise)
+], MetersController.prototype, "linkDevice", null);
+__decorate([
+    (0, common_1.Post)(':id/unlink-device'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.METER_UPDATE),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, meter_dto_1.UnlinkDeviceDto, Object]),
+    __metadata("design:returntype", Promise)
+], MetersController.prototype, "unlinkDevice", null);
 __decorate([
     (0, common_1.Post)(':id/valve'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.VALVE_CONTROL),

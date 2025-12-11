@@ -1,5 +1,7 @@
 // =============================================================================
-// Readings Processor - BullMQ Worker for Processing Readings
+// Readings Processor - Refactored for Asset/Device Split
+// =============================================================================
+// NEW: Uses DeviceProfile decoder, updates Device's last communication info
 // =============================================================================
 
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
@@ -23,7 +25,7 @@ export class ReadingsProcessor extends WorkerHost {
     jobId: string;
     data: ReadingJobData;
     decoded: DecodedReading;
-    meterProfile: string;
+    deviceProfileId: string;
   }> = [];
   private bufferFlushTimeout: NodeJS.Timeout | null = null;
   private readonly BUFFER_SIZE = 100;
@@ -42,12 +44,12 @@ export class ReadingsProcessor extends WorkerHost {
    * Process a single reading job
    */
   async process(job: Job<ReadingJobData>): Promise<any> {
-    const { tenantId, meterId, deviceId, technology, payload, timestamp, metadata } = job.data;
+    const { tenantId, meterId, deviceId, internalDeviceId, technology, payload, timestamp, metadata } = job.data;
 
     this.logger.debug(`Processing job ${job.id} for device ${deviceId}`);
 
     try {
-      // 1. Get meter and profile info
+      // 1. Get meter and device info
       const meter = await this.prisma.meter.findUnique({
         where: { id: meterId },
         select: {
@@ -56,6 +58,19 @@ export class ReadingsProcessor extends WorkerHost {
           meterProfileId: true,
           lastReadingValue: true,
           initialIndex: true,
+          activeDeviceId: true,
+          activeDevice: {
+            select: {
+              id: true,
+              deviceProfileId: true,
+              deviceProfile: {
+                select: {
+                  id: true,
+                  decoderFunction: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -63,10 +78,15 @@ export class ReadingsProcessor extends WorkerHost {
         throw new Error(`Meter not found: ${meterId}`);
       }
 
-      // 2. Decode payload using decoder service
-      const decoded = await this.decoderService.decode(
-        meter.meterProfileId,
-        technology,
+      // Verify device is still linked to this meter
+      if (!meter.activeDevice) {
+        throw new Error(`Meter ${meterId} has no active device`);
+      }
+
+      // 2. Decode payload using DeviceProfile's decoder
+      const decoderFunction = meter.activeDevice.deviceProfile.decoderFunction;
+      const decoded = await this.decoderService.decodeWithFunction(
+        decoderFunction || '',
         payload,
       );
 
@@ -91,7 +111,7 @@ export class ReadingsProcessor extends WorkerHost {
         jobId: job.id!,
         data: job.data,
         decoded: { ...decoded, consumption },
-        meterProfile: meter.meterProfileId,
+        deviceProfileId: meter.activeDevice.deviceProfileId,
       });
 
       // 6. Flush buffer if full or schedule flush
@@ -148,25 +168,38 @@ export class ReadingsProcessor extends WorkerHost {
         temperature: item.decoded.temperature,
         raw_payload: { payload: item.data.payload, ...item.decoded.raw },
         source: item.data.technology,
-        source_device_id: item.data.deviceId,
+        source_device_id: item.data.internalDeviceId || item.data.deviceId,
         communication_technology: item.data.technology as any,
-        decoder_used: item.meterProfile,
+        decoder_used: item.deviceProfileId,
       }));
 
       // Bulk insert using Kysely (optimized for TimescaleDB)
       await this.kysely.bulkInsertReadings(readings);
 
       // Update meter last reading values
-      const meterUpdates = new Map<string, { value: number; time: Date; signal?: number; battery?: number }>();
+      const meterUpdates = new Map<string, { value: number; time: Date }>();
+      const deviceUpdates = new Map<string, { signal?: number; battery?: number; time: Date }>();
+
       for (const item of itemsToFlush) {
-        const existing = meterUpdates.get(item.data.meterId!);
-        if (!existing || item.data.timestamp > existing.time) {
+        // Track meter updates
+        const existingMeter = meterUpdates.get(item.data.meterId!);
+        if (!existingMeter || item.data.timestamp > existingMeter.time) {
           meterUpdates.set(item.data.meterId!, {
             value: item.decoded.value,
             time: item.data.timestamp,
-            signal: item.decoded.signalStrength,
-            battery: item.decoded.batteryLevel,
           });
+        }
+
+        // Track device updates
+        if (item.data.internalDeviceId) {
+          const existingDevice = deviceUpdates.get(item.data.internalDeviceId);
+          if (!existingDevice || item.data.timestamp > existingDevice.time) {
+            deviceUpdates.set(item.data.internalDeviceId, {
+              signal: item.decoded.signalStrength,
+              battery: item.decoded.batteryLevel,
+              time: item.data.timestamp,
+            });
+          }
         }
       }
 
@@ -178,8 +211,20 @@ export class ReadingsProcessor extends WorkerHost {
             data: {
               lastReadingValue: update.value,
               lastReadingTime: update.time,
+            },
+          }),
+        ),
+      );
+
+      // Update devices with last communication info
+      await Promise.all(
+        Array.from(deviceUpdates.entries()).map(([deviceId, update]) =>
+          this.prisma.device.update({
+            where: { id: deviceId },
+            data: {
               lastSignalStrength: update.signal,
               lastBatteryLevel: update.battery,
+              lastCommunicationAt: update.time,
             },
           }),
         ),
@@ -221,6 +266,7 @@ export class ReadingsProcessor extends WorkerHost {
       byTenant.get(tenantId)!.push({
         meterId: item.data.meterId,
         deviceId: item.data.deviceId,
+        internalDeviceId: item.data.internalDeviceId,
         value: item.decoded.value,
         consumption: item.decoded.consumption,
         timestamp: item.data.timestamp,
@@ -328,4 +374,3 @@ export class ReadingsProcessor extends WorkerHost {
     this.logger.error(`Worker error: ${error.message}`);
   }
 }
-

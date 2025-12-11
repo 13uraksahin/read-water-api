@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ControlValveDto = exports.MeterQueryDto = exports.UpdateMeterDto = exports.CreateMeterDto = void 0;
+exports.UnlinkDeviceDto = exports.LinkDeviceDto = exports.ControlValveDto = exports.MeterQueryDto = exports.UpdateMeterDto = exports.CreateMeterDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
@@ -69,43 +69,6 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], AddressDto.prototype, "extraDetails", void 0);
-class ConnectivityFieldsDto {
-    technology;
-    fields;
-}
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
-], ConnectivityFieldsDto.prototype, "technology", void 0);
-__decorate([
-    (0, class_validator_1.IsObject)(),
-    (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", Object)
-], ConnectivityFieldsDto.prototype, "fields", void 0);
-class ConnectivityConfigDto {
-    primary;
-    secondary;
-    others;
-}
-__decorate([
-    (0, class_validator_1.ValidateNested)(),
-    (0, class_transformer_1.Type)(() => ConnectivityFieldsDto),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", ConnectivityFieldsDto)
-], ConnectivityConfigDto.prototype, "primary", void 0);
-__decorate([
-    (0, class_validator_1.ValidateNested)(),
-    (0, class_transformer_1.Type)(() => ConnectivityFieldsDto),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", ConnectivityFieldsDto)
-], ConnectivityConfigDto.prototype, "secondary", void 0);
-__decorate([
-    (0, class_validator_1.ValidateNested)({ each: true }),
-    (0, class_transformer_1.Type)(() => ConnectivityFieldsDto),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Array)
-], ConnectivityConfigDto.prototype, "others", void 0);
 class CreateMeterDto {
     tenantId;
     customerId;
@@ -114,7 +77,6 @@ class CreateMeterDto {
     initialIndex;
     installationDate;
     status;
-    connectivityConfig;
     address;
     addressCode;
     latitude;
@@ -129,7 +91,7 @@ __decorate([
 ], CreateMeterDto.prototype, "tenantId", void 0);
 __decorate([
     (0, class_validator_1.IsUUID)(),
-    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateMeterDto.prototype, "customerId", void 0);
 __decorate([
@@ -145,6 +107,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterDto.prototype, "initialIndex", void 0);
 __decorate([
@@ -159,12 +122,6 @@ __decorate([
 ], CreateMeterDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.ValidateNested)(),
-    (0, class_transformer_1.Type)(() => ConnectivityConfigDto),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", ConnectivityConfigDto)
-], CreateMeterDto.prototype, "connectivityConfig", void 0);
-__decorate([
-    (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => AddressDto),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", AddressDto)
@@ -177,11 +134,13 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterDto.prototype, "latitude", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], CreateMeterDto.prototype, "longitude", void 0);
 __decorate([
@@ -195,7 +154,6 @@ class UpdateMeterDto {
     serialNumber;
     status;
     valveStatus;
-    connectivityConfig;
     address;
     addressCode;
     latitude;
@@ -230,12 +188,6 @@ __decorate([
 ], UpdateMeterDto.prototype, "valveStatus", void 0);
 __decorate([
     (0, class_validator_1.ValidateNested)(),
-    (0, class_transformer_1.Type)(() => ConnectivityConfigDto),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", ConnectivityConfigDto)
-], UpdateMeterDto.prototype, "connectivityConfig", void 0);
-__decorate([
-    (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => AddressDto),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", AddressDto)
@@ -248,11 +200,13 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterDto.prototype, "latitude", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], UpdateMeterDto.prototype, "longitude", void 0);
 __decorate([
@@ -275,11 +229,13 @@ exports.MeterQueryDto = MeterQueryDto;
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], MeterQueryDto.prototype, "page", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
     __metadata("design:type", Number)
 ], MeterQueryDto.prototype, "limit", void 0);
 __decorate([
@@ -326,4 +282,22 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], ControlValveDto.prototype, "action", void 0);
+class LinkDeviceDto {
+    deviceId;
+}
+exports.LinkDeviceDto = LinkDeviceDto;
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], LinkDeviceDto.prototype, "deviceId", void 0);
+class UnlinkDeviceDto {
+    deviceStatus;
+}
+exports.UnlinkDeviceDto = UnlinkDeviceDto;
+__decorate([
+    (0, class_validator_1.IsEnum)(['WAREHOUSE', 'MAINTENANCE']),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UnlinkDeviceDto.prototype, "deviceStatus", void 0);
 //# sourceMappingURL=meter.dto.js.map

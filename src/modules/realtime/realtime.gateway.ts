@@ -27,9 +27,18 @@ interface AuthenticatedSocket extends Socket {
 
 @WebSocketGateway({
   cors: {
-    origin: '*', // Configure in production
+    origin: [
+      'http://localhost:3000',
+      'https://read-water-app.portall.com.tr',
+      // Allow any origin in development - override via CORS_ORIGINS env var
+      ...(process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()) || []),
+    ],
+    credentials: true,
   },
   namespace: '/realtime',
+  // Support Cloudflare tunnel and proxied connections
+  transports: ['websocket', 'polling'],
+  allowUpgrades: true,
 })
 export class RealtimeGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect

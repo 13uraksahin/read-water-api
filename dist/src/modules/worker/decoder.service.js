@@ -58,10 +58,10 @@ let DecoderService = DecoderService_1 = class DecoderService {
         this.prisma = prisma;
         this.redisService = redisService;
     }
-    async decode(profileId, technology, payload) {
-        const decoder = await this.getDecoderFunction(profileId, technology);
+    async decode(deviceProfileId, payload) {
+        const decoder = await this.getDecoderFunction(deviceProfileId);
         if (!decoder) {
-            this.logger.warn(`No decoder found for profile ${profileId}, technology ${technology}`);
+            this.logger.warn(`No decoder found for device profile ${deviceProfileId}`);
             return this.defaultDecode(payload);
         }
         try {
@@ -73,33 +73,41 @@ let DecoderService = DecoderService_1 = class DecoderService {
             return this.defaultDecode(payload);
         }
     }
-    async getDecoderFunction(profileId, technology) {
-        const cacheKey = `${profileId}:${technology}`;
+    async decodeWithFunction(decoderCode, payload) {
+        if (!decoderCode) {
+            return this.defaultDecode(payload);
+        }
+        try {
+            const result = await this.executeDecoder(decoderCode, payload);
+            return this.validateDecodedResult(result);
+        }
+        catch (error) {
+            this.logger.error(`Decoder execution failed: ${error.message}`);
+            return this.defaultDecode(payload);
+        }
+    }
+    async getDecoderFunction(deviceProfileId) {
+        const cacheKey = deviceProfileId;
         const cached = this.decoderCache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
             return cached.fn.toString();
         }
-        const redisKey = constants_1.CACHE_KEYS.DECODER_FUNCTION(`${profileId}:${technology}`);
+        const redisKey = constants_1.CACHE_KEYS.DECODER_FUNCTION(deviceProfileId);
         const redisValue = await this.redisService.get(redisKey);
         if (redisValue) {
             this.cacheDecoder(cacheKey, redisValue);
             return redisValue;
         }
-        const profile = await this.prisma.meterProfile.findUnique({
-            where: { id: profileId },
-            select: { communicationConfigs: true },
+        const deviceProfile = await this.prisma.deviceProfile.findUnique({
+            where: { id: deviceProfileId },
+            select: { decoderFunction: true },
         });
-        if (!profile || !profile.communicationConfigs) {
+        if (!deviceProfile || !deviceProfile.decoderFunction) {
             return null;
         }
-        const configs = profile.communicationConfigs;
-        const techConfig = configs.find((c) => c.technology === technology);
-        if (!techConfig || !techConfig.decoder) {
-            return null;
-        }
-        await this.redisService.set(redisKey, techConfig.decoder, constants_1.CACHE_TTL.MEDIUM);
-        this.cacheDecoder(cacheKey, techConfig.decoder);
-        return techConfig.decoder;
+        await this.redisService.set(redisKey, deviceProfile.decoderFunction, constants_1.CACHE_TTL.MEDIUM);
+        this.cacheDecoder(cacheKey, deviceProfile.decoderFunction);
+        return deviceProfile.decoderFunction;
     }
     async executeDecoder(decoderCode, payload) {
         const sandbox = {

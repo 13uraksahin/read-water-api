@@ -21,4 +21,11 @@ export declare class ProfilesService {
         fields: import("@prisma/client/runtime/library").JsonValue;
         integrationTypes: import("@prisma/client").$Enums.IntegrationType[];
     }[]>;
+    getDeviceProfiles(): Promise<{
+        id: string;
+        brand: import("@prisma/client").$Enums.DeviceBrand;
+        modelCode: string;
+        communicationTechnology: import("@prisma/client").$Enums.CommunicationTechnology;
+        batteryLifeMonths: number | null;
+    }[]>;
 }

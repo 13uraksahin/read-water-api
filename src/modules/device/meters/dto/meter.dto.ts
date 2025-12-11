@@ -1,5 +1,8 @@
 // =============================================================================
-// Meter DTOs
+// Meter DTOs - Refactored for Asset/Device Split
+// =============================================================================
+// REMOVED: All connectivity_config, communication fields
+// Meters are now pure assets - connectivity is handled by Device entity
 // =============================================================================
 
 import {
@@ -13,7 +16,7 @@ import {
   IsObject,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { MeterStatus, ValveStatus } from '@prisma/client';
 
 class AddressDto {
@@ -54,42 +57,17 @@ class AddressDto {
   extraDetails?: string;
 }
 
-class ConnectivityFieldsDto {
-  @IsString()
-  @IsNotEmpty()
-  technology: string;
-
-  @IsObject()
-  @IsNotEmpty()
-  fields: Record<string, string>;
-}
-
-class ConnectivityConfigDto {
-  @ValidateNested()
-  @Type(() => ConnectivityFieldsDto)
-  @IsOptional()
-  primary?: ConnectivityFieldsDto;
-
-  @ValidateNested()
-  @Type(() => ConnectivityFieldsDto)
-  @IsOptional()
-  secondary?: ConnectivityFieldsDto;
-
-  @ValidateNested({ each: true })
-  @Type(() => ConnectivityFieldsDto)
-  @IsOptional()
-  others?: ConnectivityFieldsDto[];
-}
-
 export class CreateMeterDto {
   @IsUUID()
   @IsNotEmpty()
   tenantId: string;
 
+  // STRICT: A meter must be related with at least and only 1 customer
   @IsUUID()
-  @IsOptional()
-  customerId?: string;
+  @IsNotEmpty()
+  customerId: string;
 
+  // STRICT: A meter must be related with at least and only 1 meter profile
   @IsUUID()
   @IsNotEmpty()
   meterProfileId: string;
@@ -100,6 +78,7 @@ export class CreateMeterDto {
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   initialIndex?: number;
 
   @IsDateString()
@@ -109,11 +88,6 @@ export class CreateMeterDto {
   @IsEnum(MeterStatus)
   @IsOptional()
   status?: MeterStatus;
-
-  @ValidateNested()
-  @Type(() => ConnectivityConfigDto)
-  @IsOptional()
-  connectivityConfig?: ConnectivityConfigDto;
 
   @ValidateNested()
   @Type(() => AddressDto)
@@ -126,10 +100,12 @@ export class CreateMeterDto {
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   latitude?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   longitude?: number;
 
   @IsObject()
@@ -159,11 +135,6 @@ export class UpdateMeterDto {
   valveStatus?: ValveStatus;
 
   @ValidateNested()
-  @Type(() => ConnectivityConfigDto)
-  @IsOptional()
-  connectivityConfig?: ConnectivityConfigDto;
-
-  @ValidateNested()
   @Type(() => AddressDto)
   @IsOptional()
   address?: AddressDto;
@@ -174,10 +145,12 @@ export class UpdateMeterDto {
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   latitude?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   longitude?: number;
 
   @IsObject()
@@ -188,10 +161,12 @@ export class UpdateMeterDto {
 export class MeterQueryDto {
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   page?: number;
 
   @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
   limit?: number;
 
   @IsUUID()
@@ -229,3 +204,15 @@ export class ControlValveDto {
   action: 'OPEN' | 'CLOSED';
 }
 
+// Link/Unlink Device DTOs
+export class LinkDeviceDto {
+  @IsUUID()
+  @IsNotEmpty()
+  deviceId: string;
+}
+
+export class UnlinkDeviceDto {
+  @IsEnum(['WAREHOUSE', 'MAINTENANCE'])
+  @IsOptional()
+  deviceStatus?: 'WAREHOUSE' | 'MAINTENANCE';
+}

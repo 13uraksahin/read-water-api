@@ -67,7 +67,7 @@ enum CommunicationModule {
   NONE
 }
 
-// 6.7 Brands
+// 6.7 Meter Brands
 enum Brand {
   BAYLAN
   MANAS
@@ -77,6 +77,14 @@ enum Brand {
   TURKOGLU
   BEREKET
   TEKSAN
+}
+
+// 13. Device Brands
+enum DeviceBrand {
+  UNA
+  IMA
+  ITRON
+  ZENNER
 }
 
 // 6.8 Communication Technologies
@@ -113,6 +121,16 @@ enum CustomerType {
 
 // 6.12 Meter Statuses
 enum MeterStatus {
+  ACTIVE
+  PASSIVE
+  WAREHOUSE
+  MAINTENANCE
+  PLANNED
+  DEPLOYED // Deployed but not started
+}
+
+// 6.16 Device Statuses (same as Meter Statuses per spec)
+enum DeviceStatus {
   ACTIVE
   PASSIVE
   WAREHOUSE
@@ -222,6 +240,7 @@ model Tenant {
   users            UserTenant[]
   customers        Customer[]
   meters           Meter[]
+  devices          Device[]
   readings         Reading[]
   alarms           Alarm[]
   allowedProfiles  MeterProfile[] @relation("TenantAllowedProfiles")
@@ -321,6 +340,7 @@ model Customer {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // STRICT: A customer must be related with at least and only 1 tenant
   tenantId String @map("tenant_id") @db.Uuid
 
   // Customer Classification
@@ -352,7 +372,104 @@ model Customer {
 }
 
 // -----------------------------------------------------------------------------
+// 12. Device Profiles - Communication Unit Configuration
+// Moved from MeterProfile: decoder functions, communication tech specs
+// -----------------------------------------------------------------------------
+model DeviceProfile {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // DeviceBrand + Model Code must be unique
+  brand     DeviceBrand
+  modelCode String      @map("model_code")
+
+  // Communication Technology this device uses
+  communicationTechnology CommunicationTechnology @map("communication_technology")
+
+  // Integration type (how this device communicates)
+  integrationType IntegrationType @default(HTTP) @map("integration_type")
+
+  // Dynamic field definitions for this device type
+  // Example: [{ name: "DevEUI", type: "hex", length: 16, regex: "^[a-fA-F0-9]{16}$", required: true }]
+  fieldDefinitions Json @default("[]") @map("field_definitions") @db.JsonB
+
+  // Decoder function (JS Expression) for parsing payloads from this device
+  // Example: "function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }"
+  decoderFunction String? @map("decoder_function") @db.Text
+
+  // Decoder metadata for testing
+  testPayload       String? @map("test_payload")
+  expectedOutput    Json?   @map("expected_output") @db.JsonB
+  lastTestedAt      DateTime? @map("last_tested_at")
+  lastTestSucceeded Boolean?  @map("last_test_succeeded")
+
+  // Battery life (months) - applicable if communication module is not none
+  batteryLifeMonths Int? @map("battery_life_months")
+
+  // Additional specifications
+  specifications Json? @db.JsonB
+
+  // Relations
+  devices              Device[]
+  compatibleMeterProfiles MeterProfile[] @relation("CompatibleDeviceProfiles")
+
+  @@unique([brand, modelCode])
+  @@index([brand])
+  @@index([communicationTechnology])
+  @@map("device_profiles")
+}
+
+// -----------------------------------------------------------------------------
+// 11. Devices - Physical Communication Units
+// -----------------------------------------------------------------------------
+model Device {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // STRICT: A device must be related with at least and only 1 tenant
+  tenantId String @map("tenant_id") @db.Uuid
+
+  // STRICT: A device must be related with at least and only 1 device profile
+  deviceProfileId String @map("device_profile_id") @db.Uuid
+
+  // Identification
+  serialNumber String @unique @map("serial_number")
+
+  // Status
+  status DeviceStatus @default(WAREHOUSE)
+
+  // Dynamic fields stored in JSONB (populated based on DeviceProfile.fieldDefinitions)
+  // Example for LoRaWAN: { DevEUI: "0011223344556677", JoinEUI: "...", AppKey: "..." }
+  dynamicFields Json @default("{}") @map("dynamic_fields") @db.JsonB
+
+  // Last connectivity info (cached for quick access)
+  lastSignalStrength Int?      @map("last_signal_strength") // dBm
+  lastBatteryLevel   Int?      @map("last_battery_level")   // percentage
+  lastCommunicationAt DateTime? @map("last_communication_at")
+
+  // Additional metadata
+  metadata Json? @db.JsonB
+
+  // Relations
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deviceProfile DeviceProfile @relation(fields: [deviceProfileId], references: [id], onDelete: Restrict)
+  
+  // A device may or may not be related with a meter (If related, only 1)
+  // This is the inverse of Meter.activeDevice
+  meter         Meter?
+
+  @@index([tenantId])
+  @@index([deviceProfileId])
+  @@index([status])
+  @@index([serialNumber])
+  @@map("devices")
+}
+
+// -----------------------------------------------------------------------------
 // 5.1 Meter Profiles (System Configuration)
+// REFACTORED: Removed communication configs - now in DeviceProfile
 // -----------------------------------------------------------------------------
 model MeterProfile {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -387,21 +504,16 @@ model MeterProfile {
   // Protection
   ipRating IPRating? @map("ip_rating")
 
-  // Communication Configuration
+  // Communication Module Type (indicates if meter has integrated/retrofit/none)
   communicationModule CommunicationModule @default(NONE) @map("communication_module")
-  batteryLifeMonths   Int?                @map("battery_life_months")
-
-  // Communication Technologies Configuration
-  // Array of technology configs with decoder functions and field definitions
-  // Example: [{ technology: "LORAWAN", fields: [...], decoder: "function(payload) {...}" }]
-  communicationConfigs Json[] @default([]) @map("communication_configs") @db.JsonB
 
   // Additional specifications
   specifications Json? @db.JsonB
 
   // Relations
-  meters         Meter[]
-  allowedTenants Tenant[] @relation("TenantAllowedProfiles")
+  meters                   Meter[]
+  allowedTenants           Tenant[]        @relation("TenantAllowedProfiles")
+  compatibleDeviceProfiles DeviceProfile[] @relation("CompatibleDeviceProfiles")
 
   @@unique([brand, modelCode])
   @@index([brand])
@@ -410,16 +522,25 @@ model MeterProfile {
 }
 
 // -----------------------------------------------------------------------------
-// 4. Meters
+// 4. Meters (Assets)
+// REFACTORED: Removed connectivity_config, added device relation
 // -----------------------------------------------------------------------------
 model Meter {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Tenant is derived from Customer, but kept for query efficiency
   tenantId       String  @map("tenant_id") @db.Uuid
-  customerId     String? @map("customer_id") @db.Uuid
+
+  // STRICT: A meter must be related with at least and only 1 customer
+  customerId     String  @map("customer_id") @db.Uuid
+
+  // STRICT: A meter must be related with at least and only 1 meter profile
   meterProfileId String  @map("meter_profile_id") @db.Uuid
+
+  // A meter may or may not be related with device (If related, only 1)
+  activeDeviceId String? @unique @map("active_device_id") @db.Uuid
 
   // Identification
   serialNumber String @unique @map("serial_number")
@@ -435,12 +556,6 @@ model Meter {
   // Last Reading Cache (for quick access)
   lastReadingValue Decimal?  @map("last_reading_value") @db.Decimal(15, 3)
   lastReadingTime  DateTime? @map("last_reading_time")
-  lastSignalStrength Int?    @map("last_signal_strength") // dBm
-  lastBatteryLevel   Int?    @map("last_battery_level")   // percentage
-
-  // WAN Connectivity Configuration stored in JSONB
-  // Structure: { primary: { technology, fields }, secondary: { technology, fields }, others: [...] }
-  connectivityConfig Json @default("{}") @map("connectivity_config") @db.JsonB
 
   // Address
   address     Json     @db.JsonB
@@ -453,8 +568,9 @@ model Meter {
 
   // Relations
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   meterProfile MeterProfile @relation(fields: [meterProfileId], references: [id], onDelete: Restrict)
+  activeDevice Device?      @relation(fields: [activeDeviceId], references: [id], onDelete: SetNull)
   readings     Reading[]
   alarms       Alarm[]
 
@@ -494,7 +610,7 @@ model Reading {
 
   // Source information
   source          String?                 // e.g., "LORAWAN", "HTTP", "MANUAL"
-  sourceDeviceId  String? @map("source_device_id")
+  sourceDeviceId  String? @map("source_device_id") @db.Uuid
   communicationTechnology CommunicationTechnology? @map("communication_technology")
 
   // Processing metadata
@@ -572,42 +688,8 @@ model Setting {
 }
 
 // -----------------------------------------------------------------------------
-// 9. Decoder Functions - Stored separately for easy management
-// -----------------------------------------------------------------------------
-model DecoderFunction {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  name                    String
-  description             String?
-  communicationTechnology CommunicationTechnology @map("communication_technology")
-
-  // The JavaScript decoder function code
-  // Example: "function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }"
-  code String @db.Text
-
-  // Version tracking
-  version   Int     @default(1)
-  isActive  Boolean @default(true) @map("is_active")
-
-  // Testing
-  testPayload       String? @map("test_payload")
-  expectedOutput    Json?   @map("expected_output") @db.JsonB
-  lastTestedAt      DateTime? @map("last_tested_at")
-  lastTestSucceeded Boolean?  @map("last_test_succeeded")
-
-  // Associated meter profile reference (stored as metadata)
-  metadata Json? @db.JsonB
-
-  @@index([communicationTechnology])
-  @@index([isActive])
-  @@map("decoder_functions")
-}
-
-// -----------------------------------------------------------------------------
 // Communication Technology Field Definitions
-// Defines what fields are required for each technology when adding meters
+// Defines what fields are required for each technology when adding devices
 // -----------------------------------------------------------------------------
 model CommunicationTechFieldDef {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

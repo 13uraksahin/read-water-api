@@ -58,9 +58,22 @@ let ProfilesService = ProfilesService_1 = class ProfilesService {
                 pressureLoss: dto.pressureLoss,
                 ipRating: dto.ipRating,
                 communicationModule: dto.communicationModule,
-                batteryLifeMonths: dto.batteryLifeMonths,
-                communicationConfigs: dto.communicationConfigs,
                 specifications: dto.specifications,
+                compatibleDeviceProfiles: dto.compatibleDeviceProfileIds
+                    ? {
+                        connect: dto.compatibleDeviceProfileIds.map((id) => ({ id })),
+                    }
+                    : undefined,
+            },
+            include: {
+                compatibleDeviceProfiles: {
+                    select: {
+                        id: true,
+                        brand: true,
+                        modelCode: true,
+                        communicationTechnology: true,
+                    },
+                },
             },
         });
         this.logger.log(`Created profile: ${profile.brand} ${profile.modelCode}`);
@@ -91,6 +104,14 @@ let ProfilesService = ProfilesService_1 = class ProfilesService {
                     [query.sortBy || 'brand']: query.sortOrder || 'asc',
                 },
                 include: {
+                    compatibleDeviceProfiles: {
+                        select: {
+                            id: true,
+                            brand: true,
+                            modelCode: true,
+                            communicationTechnology: true,
+                        },
+                    },
                     _count: {
                         select: { meters: true },
                     },
@@ -116,6 +137,15 @@ let ProfilesService = ProfilesService_1 = class ProfilesService {
             include: {
                 allowedTenants: {
                     select: { id: true, name: true, path: true },
+                },
+                compatibleDeviceProfiles: {
+                    select: {
+                        id: true,
+                        brand: true,
+                        modelCode: true,
+                        communicationTechnology: true,
+                        batteryLifeMonths: true,
+                    },
                 },
                 _count: {
                     select: { meters: true },
@@ -154,9 +184,22 @@ let ProfilesService = ProfilesService_1 = class ProfilesService {
                 pressureLoss: dto.pressureLoss,
                 ipRating: dto.ipRating,
                 communicationModule: dto.communicationModule,
-                batteryLifeMonths: dto.batteryLifeMonths,
-                communicationConfigs: dto.communicationConfigs,
                 specifications: dto.specifications,
+                compatibleDeviceProfiles: dto.compatibleDeviceProfileIds
+                    ? {
+                        set: dto.compatibleDeviceProfileIds.map((id) => ({ id })),
+                    }
+                    : undefined,
+            },
+            include: {
+                compatibleDeviceProfiles: {
+                    select: {
+                        id: true,
+                        brand: true,
+                        modelCode: true,
+                        communicationTechnology: true,
+                    },
+                },
             },
         });
         await this.redisService.del(constants_1.CACHE_KEYS.METER_PROFILE(id));
@@ -187,6 +230,18 @@ let ProfilesService = ProfilesService_1 = class ProfilesService {
     async getCommunicationTechFields() {
         return this.prisma.communicationTechFieldDef.findMany({
             orderBy: { technology: 'asc' },
+        });
+    }
+    async getDeviceProfiles() {
+        return this.prisma.deviceProfile.findMany({
+            select: {
+                id: true,
+                brand: true,
+                modelCode: true,
+                communicationTechnology: true,
+                batteryLifeMonths: true,
+            },
+            orderBy: [{ brand: 'asc' }, { modelCode: 'asc' }],
         });
     }
 };

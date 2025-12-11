@@ -1,17 +1,4 @@
-import { Brand, MeterType, DialType, ConnectionType, MountingType, TemperatureType, IPRating, CommunicationModule, CommunicationTechnology } from '@prisma/client';
-declare class CommunicationConfigDto {
-    technology: CommunicationTechnology;
-    fields?: Array<{
-        name: string;
-        label: string;
-        type: string;
-        length?: number;
-        regex?: string;
-        required: boolean;
-        description?: string;
-    }>;
-    decoder?: string;
-}
+import { Brand, MeterType, DialType, ConnectionType, MountingType, TemperatureType, IPRating, CommunicationModule } from '@prisma/client';
 export declare class CreateMeterProfileDto {
     brand: Brand;
     modelCode: string;
@@ -32,8 +19,7 @@ export declare class CreateMeterProfileDto {
     pressureLoss?: number;
     ipRating?: IPRating;
     communicationModule?: CommunicationModule;
-    batteryLifeMonths?: number;
-    communicationConfigs?: CommunicationConfigDto[];
+    compatibleDeviceProfileIds?: string[];
     specifications?: Record<string, any>;
 }
 export declare class UpdateMeterProfileDto {
@@ -55,8 +41,7 @@ export declare class UpdateMeterProfileDto {
     pressureLoss?: number;
     ipRating?: IPRating;
     communicationModule?: CommunicationModule;
-    batteryLifeMonths?: number;
-    communicationConfigs?: CommunicationConfigDto[];
+    compatibleDeviceProfileIds?: string[];
     specifications?: Record<string, any>;
 }
 export declare class ProfileQueryDto {
@@ -68,4 +53,3 @@ export declare class ProfileQueryDto {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }
-export {};

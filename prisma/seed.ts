@@ -5,10 +5,29 @@
 // 1. Communication Technology Field Definitions (from Functional Specifications 6.8)
 // 2. Root Tenant
 // 3. Platform Admin User
+// 4. Device Profiles with Decoder Functions
+// 5. Sample Warehouse Devices
+// 6. Sample Meter Profiles with Compatible Device Profiles
 // =============================================================================
 
 import 'dotenv/config';
-import { PrismaClient, CommunicationTechnology, IntegrationType, SystemRole, SubscriptionStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  CommunicationTechnology,
+  IntegrationType,
+  SystemRole,
+  SubscriptionStatus,
+  DeviceBrand,
+  DeviceStatus,
+  Brand,
+  MeterType,
+  DialType,
+  ConnectionType,
+  MountingType,
+  TemperatureType,
+  CommunicationModule,
+  IPRating,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 // Initialize Prisma Client
@@ -265,6 +284,217 @@ const communicationTechFieldDefs = [
 ];
 
 // =============================================================================
+// DEVICE PROFILES - From Section 12 of Functional Specifications
+// Decoder functions are now stored here instead of in MeterProfile
+// =============================================================================
+const deviceProfiles = [
+  {
+    brand: DeviceBrand.UNA,
+    modelCode: 'UNA-LORA-01',
+    communicationTechnology: CommunicationTechnology.LORAWAN,
+    integrationType: IntegrationType.MQTT,
+    fieldDefinitions: [
+      { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+      { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+      { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
+    ],
+    decoderFunction: `
+// UNA LoRaWAN Water Meter Decoder
+// Expects payload: [4 bytes value] [1 byte battery] [1 byte signal]
+function decode(payload) {
+  const bytes = Buffer.from(payload, 'hex');
+  
+  // Parse meter value (4 bytes, big-endian, divided by 1000 for m³)
+  const value = bytes.readUInt32BE(0) / 1000;
+  
+  // Parse battery level (1 byte, percentage)
+  const batteryLevel = bytes.length > 4 ? bytes.readUInt8(4) : null;
+  
+  // Parse signal strength (1 byte, signed, dBm)
+  const signalStrength = bytes.length > 5 ? bytes.readInt8(5) : null;
+  
+  return {
+    value,
+    batteryLevel,
+    signalStrength,
+    unit: 'm3'
+  };
+}`.trim(),
+    testPayload: '00015F90640A',
+    expectedOutput: { value: 89.488, batteryLevel: 100, signalStrength: 10, unit: 'm3' },
+    batteryLifeMonths: 120,
+    specifications: { manufacturer: 'Una Technologies', firmware: '1.2.0' },
+  },
+  {
+    brand: DeviceBrand.IMA,
+    modelCode: 'IMA-SIGFOX-01',
+    communicationTechnology: CommunicationTechnology.SIGFOX,
+    integrationType: IntegrationType.HTTP,
+    fieldDefinitions: [
+      { name: 'ID', type: 'hex', length: 8, regex: '^[a-fA-F0-9]{8}$', required: true },
+      { name: 'PAC', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+    ],
+    decoderFunction: `
+// IMA Sigfox Water Meter Decoder
+// Expects 12-byte payload
+function decode(payload) {
+  const bytes = Buffer.from(payload, 'hex');
+  
+  // Parse meter value (4 bytes, little-endian, in liters, convert to m³)
+  const valueLiters = bytes.readUInt32LE(0);
+  const value = valueLiters / 1000;
+  
+  // Parse battery voltage (2 bytes, mV)
+  const batteryMv = bytes.readUInt16LE(4);
+  const batteryLevel = Math.min(100, Math.round((batteryMv - 2200) / 14));
+  
+  return {
+    value,
+    batteryLevel,
+    signalStrength: null,
+    unit: 'm3'
+  };
+}`.trim(),
+    testPayload: '905F010000A40D',
+    expectedOutput: { value: 89.488, batteryLevel: 100, signalStrength: null, unit: 'm3' },
+    batteryLifeMonths: 60,
+    specifications: { manufacturer: 'IMA Metering', firmware: '2.1.0' },
+  },
+  {
+    brand: DeviceBrand.ITRON,
+    modelCode: 'ITRON-NBIOT-01',
+    communicationTechnology: CommunicationTechnology.NB_IOT,
+    integrationType: IntegrationType.HTTP,
+    fieldDefinitions: [
+      { name: 'IMEI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: true },
+      { name: 'IMSI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: false },
+      { name: 'ICCID', type: 'string', length: 20, regex: '^[0-9]{18,20}$', required: false },
+    ],
+    decoderFunction: `
+// ITRON NB-IoT Water Meter Decoder (JSON payload)
+function decode(payload) {
+  // ITRON sends JSON payloads
+  const data = JSON.parse(payload);
+  
+  return {
+    value: data.meterReading / 1000,
+    batteryLevel: data.batteryPercent,
+    signalStrength: data.rssi,
+    unit: 'm3'
+  };
+}`.trim(),
+    testPayload: '{"meterReading":89488,"batteryPercent":95,"rssi":-85}',
+    expectedOutput: { value: 89.488, batteryLevel: 95, signalStrength: -85, unit: 'm3' },
+    batteryLifeMonths: 84,
+    specifications: { manufacturer: 'Itron Inc.', firmware: '3.0.1' },
+  },
+  {
+    brand: DeviceBrand.ZENNER,
+    modelCode: 'ZENNER-WMBUS-01',
+    communicationTechnology: CommunicationTechnology.WM_BUS,
+    integrationType: IntegrationType.MQTT,
+    fieldDefinitions: [
+      { name: 'ManufacturerId', type: 'string', length: 3, regex: '^[A-Z]{3}$', required: true },
+      { name: 'DeviceId', type: 'hex', length: 8, regex: '^[a-fA-F0-9]{8}$', required: true },
+      { name: 'EncryptionKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: false },
+    ],
+    decoderFunction: `
+// ZENNER wM-Bus Water Meter Decoder
+function decode(payload) {
+  const bytes = Buffer.from(payload, 'hex');
+  
+  // wM-Bus standard format
+  // Skip header (first 12 bytes), value at offset 12
+  const value = bytes.readUInt32LE(12) / 1000;
+  const batteryLevel = bytes.length > 16 ? bytes.readUInt8(16) : null;
+  
+  return {
+    value,
+    batteryLevel,
+    signalStrength: null,
+    unit: 'm3'
+  };
+}`.trim(),
+    testPayload: '0000000000000000000000009050010064',
+    expectedOutput: { value: 89.488, batteryLevel: 100, signalStrength: null, unit: 'm3' },
+    batteryLifeMonths: 96,
+    specifications: { manufacturer: 'Zenner International', firmware: '1.5.2' },
+  },
+];
+
+// =============================================================================
+// METER PROFILES - From Section 5.1 of Functional Specifications
+// =============================================================================
+const meterProfiles = [
+  {
+    brand: Brand.BAYLAN,
+    modelCode: 'TK-3S-DN15',
+    meterType: MeterType.MULTI_JET,
+    dialType: DialType.DRY,
+    connectionType: ConnectionType.THREAD,
+    mountingType: MountingType.HORIZONTAL,
+    temperatureType: TemperatureType.T30,
+    diameter: 15,
+    length: 165,
+    width: 75,
+    height: 95,
+    q1: 0.01,
+    q2: 0.016,
+    q3: 2.5,
+    q4: 3.125,
+    rValue: 250,
+    pressureLoss: 0.063,
+    ipRating: IPRating.IP68,
+    communicationModule: CommunicationModule.RETROFIT,
+    specifications: { material: 'Brass', maxPressure: '16 bar' },
+  },
+  {
+    brand: Brand.ZENNER,
+    modelCode: 'MTKD-N-DN20',
+    meterType: MeterType.MULTI_JET,
+    dialType: DialType.SUPER_DRY,
+    connectionType: ConnectionType.THREAD,
+    mountingType: MountingType.BOTH,
+    temperatureType: TemperatureType.T30,
+    diameter: 20,
+    length: 190,
+    width: 80,
+    height: 100,
+    q1: 0.016,
+    q2: 0.025,
+    q3: 4.0,
+    q4: 5.0,
+    rValue: 250,
+    pressureLoss: 0.063,
+    ipRating: IPRating.IP68,
+    communicationModule: CommunicationModule.INTEGRATED,
+    specifications: { material: 'Composite', maxPressure: '16 bar' },
+  },
+  {
+    brand: Brand.MANAS,
+    modelCode: 'MNS-US-DN25',
+    meterType: MeterType.ULTRASONIC,
+    dialType: DialType.DRY,
+    connectionType: ConnectionType.FLANGE,
+    mountingType: MountingType.HORIZONTAL,
+    temperatureType: TemperatureType.T30,
+    diameter: 25,
+    length: 260,
+    width: 90,
+    height: 110,
+    q1: 0.025,
+    q2: 0.04,
+    q3: 6.3,
+    q4: 7.875,
+    rValue: 250,
+    pressureLoss: 0.025,
+    ipRating: IPRating.IP68,
+    communicationModule: CommunicationModule.INTEGRATED,
+    specifications: { material: 'Stainless Steel', maxPressure: '16 bar', noMovingParts: true },
+  },
+];
+
+// =============================================================================
 // MAIN SEED FUNCTION
 // =============================================================================
 async function main() {
@@ -403,6 +633,10 @@ async function main() {
         'profile.read',
         'profile.update',
         'profile.delete',
+        'device.create',
+        'device.read',
+        'device.update',
+        'device.delete',
         'settings.read',
         'settings.update',
       ],
@@ -412,61 +646,313 @@ async function main() {
   console.log(`   ✓ Platform Admin role assigned to ${adminUser.email}`);
 
   // ---------------------------------------------------------------------------
-  // 5. Create Sample Decoder Function
+  // 5. Create Device Profiles (with Decoder Functions)
   // ---------------------------------------------------------------------------
-  console.log('\n📝 Creating Sample Decoder Function...');
+  console.log('\n📱 Creating Device Profiles...');
 
-  await prisma.decoderFunction.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
-    update: {},
-    create: {
-      id: '00000000-0000-0000-0000-000000000001',
-      name: 'LoRaWAN Generic Decoder',
-      description: 'Generic decoder for LoRaWAN water meter payloads (hex to decimal)',
-      communicationTechnology: CommunicationTechnology.LORAWAN,
-      code: `
-// Generic LoRaWAN Water Meter Decoder
-// Expects payload: [4 bytes value] [2 bytes battery] [2 bytes signal]
-function decode(payload) {
-  const bytes = Buffer.from(payload, 'hex');
-  
-  // Parse meter value (4 bytes, big-endian, divided by 1000 for m³)
-  const value = bytes.readUInt32BE(0) / 1000;
-  
-  // Parse battery level (1 byte, percentage)
-  const batteryLevel = bytes.length > 4 ? bytes.readUInt8(4) : null;
-  
-  // Parse signal strength (1 byte, signed, dBm)
-  const signalStrength = bytes.length > 5 ? bytes.readInt8(5) : null;
-  
-  return {
-    value,
-    batteryLevel,
-    signalStrength,
-    unit: 'm3'
-  };
-}
-`.trim(),
-      version: 1,
-      isActive: true,
-      testPayload: '00015F90640A',
-      expectedOutput: {
-        value: 89.488,
-        batteryLevel: 100,
-        signalStrength: 10,
-        unit: 'm3',
-      },
-      metadata: {
-        author: 'system',
-        category: 'water-meter',
-      },
-    },
-  });
+  const createdDeviceProfiles: Record<string, { id: string; brand: DeviceBrand; modelCode: string }> = {};
 
-  console.log('   ✓ Sample LoRaWAN decoder created');
+  for (const profile of deviceProfiles) {
+    const deviceProfile = await prisma.deviceProfile.upsert({
+      where: {
+        brand_modelCode: {
+          brand: profile.brand,
+          modelCode: profile.modelCode,
+        },
+      },
+      update: {
+        fieldDefinitions: profile.fieldDefinitions,
+        decoderFunction: profile.decoderFunction,
+        testPayload: profile.testPayload,
+        expectedOutput: profile.expectedOutput,
+        batteryLifeMonths: profile.batteryLifeMonths,
+        specifications: profile.specifications,
+        integrationType: profile.integrationType,
+      },
+      create: {
+        brand: profile.brand,
+        modelCode: profile.modelCode,
+        communicationTechnology: profile.communicationTechnology,
+        integrationType: profile.integrationType,
+        fieldDefinitions: profile.fieldDefinitions,
+        decoderFunction: profile.decoderFunction,
+        testPayload: profile.testPayload,
+        expectedOutput: profile.expectedOutput,
+        batteryLifeMonths: profile.batteryLifeMonths,
+        specifications: profile.specifications,
+      },
+    });
+    createdDeviceProfiles[`${profile.brand}-${profile.modelCode}`] = {
+      id: deviceProfile.id,
+      brand: profile.brand,
+      modelCode: profile.modelCode,
+    };
+    console.log(`   ✓ ${profile.brand} ${profile.modelCode} (${profile.communicationTechnology})`);
+  }
 
   // ---------------------------------------------------------------------------
-  // 6. Create Global Settings
+  // 6. Create Meter Profiles
+  // ---------------------------------------------------------------------------
+  console.log('\n📊 Creating Meter Profiles...');
+
+  const createdMeterProfiles: Record<string, { id: string; brand: Brand; modelCode: string }> = {};
+
+  for (const profile of meterProfiles) {
+    const meterProfile = await prisma.meterProfile.upsert({
+      where: {
+        brand_modelCode: {
+          brand: profile.brand,
+          modelCode: profile.modelCode,
+        },
+      },
+      update: {
+        specifications: profile.specifications,
+      },
+      create: {
+        brand: profile.brand,
+        modelCode: profile.modelCode,
+        meterType: profile.meterType,
+        dialType: profile.dialType,
+        connectionType: profile.connectionType,
+        mountingType: profile.mountingType,
+        temperatureType: profile.temperatureType,
+        diameter: profile.diameter,
+        length: profile.length,
+        width: profile.width,
+        height: profile.height,
+        q1: profile.q1,
+        q2: profile.q2,
+        q3: profile.q3,
+        q4: profile.q4,
+        rValue: profile.rValue,
+        pressureLoss: profile.pressureLoss,
+        ipRating: profile.ipRating,
+        communicationModule: profile.communicationModule,
+        specifications: profile.specifications,
+      },
+    });
+    createdMeterProfiles[`${profile.brand}-${profile.modelCode}`] = {
+      id: meterProfile.id,
+      brand: profile.brand,
+      modelCode: profile.modelCode,
+    };
+    console.log(`   ✓ ${profile.brand} ${profile.modelCode}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 7. Create Compatible Device Profile Relationships
+  // ---------------------------------------------------------------------------
+  console.log('\n🔗 Creating Compatible Device Profile Relationships...');
+
+  // BAYLAN meters are compatible with UNA and IMA devices
+  const baylanProfile = createdMeterProfiles['BAYLAN-TK-3S-DN15'];
+  const unaProfile = createdDeviceProfiles['UNA-UNA-LORA-01'];
+  const imaProfile = createdDeviceProfiles['IMA-IMA-SIGFOX-01'];
+
+  if (baylanProfile && unaProfile) {
+    await prisma.meterProfile.update({
+      where: { id: baylanProfile.id },
+      data: {
+        compatibleDeviceProfiles: {
+          connect: [{ id: unaProfile.id }],
+        },
+      },
+    });
+    console.log(`   ✓ BAYLAN TK-3S-DN15 <-> UNA UNA-LORA-01`);
+  }
+
+  if (baylanProfile && imaProfile) {
+    await prisma.meterProfile.update({
+      where: { id: baylanProfile.id },
+      data: {
+        compatibleDeviceProfiles: {
+          connect: [{ id: imaProfile.id }],
+        },
+      },
+    });
+    console.log(`   ✓ BAYLAN TK-3S-DN15 <-> IMA IMA-SIGFOX-01`);
+  }
+
+  // ZENNER meters are compatible with ZENNER wM-Bus and ITRON NB-IoT devices
+  const zennerMeterProfile = createdMeterProfiles['ZENNER-MTKD-N-DN20'];
+  const zennerDeviceProfile = createdDeviceProfiles['ZENNER-ZENNER-WMBUS-01'];
+  const itronProfile = createdDeviceProfiles['ITRON-ITRON-NBIOT-01'];
+
+  if (zennerMeterProfile && zennerDeviceProfile) {
+    await prisma.meterProfile.update({
+      where: { id: zennerMeterProfile.id },
+      data: {
+        compatibleDeviceProfiles: {
+          connect: [{ id: zennerDeviceProfile.id }],
+        },
+      },
+    });
+    console.log(`   ✓ ZENNER MTKD-N-DN20 <-> ZENNER ZENNER-WMBUS-01`);
+  }
+
+  if (zennerMeterProfile && itronProfile) {
+    await prisma.meterProfile.update({
+      where: { id: zennerMeterProfile.id },
+      data: {
+        compatibleDeviceProfiles: {
+          connect: [{ id: itronProfile.id }],
+        },
+      },
+    });
+    console.log(`   ✓ ZENNER MTKD-N-DN20 <-> ITRON ITRON-NBIOT-01`);
+  }
+
+  // MANAS ultrasonic meters are compatible with all device profiles
+  const manasProfile = createdMeterProfiles['MANAS-MNS-US-DN25'];
+  if (manasProfile) {
+    const allDeviceProfileIds = Object.values(createdDeviceProfiles).map(p => ({ id: p.id }));
+    await prisma.meterProfile.update({
+      where: { id: manasProfile.id },
+      data: {
+        compatibleDeviceProfiles: {
+          connect: allDeviceProfileIds,
+        },
+      },
+    });
+    console.log(`   ✓ MANAS MNS-US-DN25 <-> All Device Profiles`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8. Create Sample Warehouse Devices
+  // ---------------------------------------------------------------------------
+  console.log('\n📦 Creating Sample Warehouse Devices...');
+
+  // Get device profile IDs
+  const unaDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.UNA)?.id;
+  const imaDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.IMA)?.id;
+  const itronDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.ITRON)?.id;
+  const zennerDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.ZENNER)?.id;
+
+  const warehouseDevices = [
+    // UNA LoRaWAN devices
+    ...(unaDeviceProfileId
+      ? [
+          {
+            serialNumber: 'UNA-LW-001',
+            deviceProfileId: unaDeviceProfileId,
+            dynamicFields: {
+              DevEUI: '0011223344556677',
+              JoinEUI: 'AABBCCDD11223344',
+              AppKey: '00112233445566778899AABBCCDDEEFF',
+            },
+          },
+          {
+            serialNumber: 'UNA-LW-002',
+            deviceProfileId: unaDeviceProfileId,
+            dynamicFields: {
+              DevEUI: '1122334455667788',
+              JoinEUI: 'AABBCCDD11223344',
+              AppKey: '11223344556677889900AABBCCDDEEFF',
+            },
+          },
+          {
+            serialNumber: 'UNA-LW-003',
+            deviceProfileId: unaDeviceProfileId,
+            dynamicFields: {
+              DevEUI: '2233445566778899',
+              JoinEUI: 'AABBCCDD11223344',
+              AppKey: '22334455667788990011AABBCCDDEEFF',
+            },
+          },
+        ]
+      : []),
+    // IMA Sigfox devices
+    ...(imaDeviceProfileId
+      ? [
+          {
+            serialNumber: 'IMA-SF-001',
+            deviceProfileId: imaDeviceProfileId,
+            dynamicFields: {
+              ID: 'AABBCCDD',
+              PAC: '1122334455667788',
+            },
+          },
+          {
+            serialNumber: 'IMA-SF-002',
+            deviceProfileId: imaDeviceProfileId,
+            dynamicFields: {
+              ID: 'EEFF0011',
+              PAC: '2233445566778899',
+            },
+          },
+        ]
+      : []),
+    // ITRON NB-IoT devices
+    ...(itronDeviceProfileId
+      ? [
+          {
+            serialNumber: 'ITRON-NB-001',
+            deviceProfileId: itronDeviceProfileId,
+            dynamicFields: {
+              IMEI: '123456789012345',
+              IMSI: '234567890123456',
+              ICCID: '89012345678901234567',
+            },
+          },
+          {
+            serialNumber: 'ITRON-NB-002',
+            deviceProfileId: itronDeviceProfileId,
+            dynamicFields: {
+              IMEI: '234567890123456',
+              IMSI: '345678901234567',
+              ICCID: '89123456789012345678',
+            },
+          },
+        ]
+      : []),
+    // ZENNER wM-Bus devices
+    ...(zennerDeviceProfileId
+      ? [
+          {
+            serialNumber: 'ZEN-WMB-001',
+            deviceProfileId: zennerDeviceProfileId,
+            dynamicFields: {
+              ManufacturerId: 'ZEN',
+              DeviceId: 'AABBCCDD',
+              EncryptionKey: '00112233445566778899AABBCCDDEEFF',
+            },
+          },
+          {
+            serialNumber: 'ZEN-WMB-002',
+            deviceProfileId: zennerDeviceProfileId,
+            dynamicFields: {
+              ManufacturerId: 'ZEN',
+              DeviceId: 'EEFF0011',
+              EncryptionKey: '11223344556677889900AABBCCDDEEFF',
+            },
+          },
+        ]
+      : []),
+  ];
+
+  for (const device of warehouseDevices) {
+    await prisma.device.upsert({
+      where: { serialNumber: device.serialNumber },
+      update: {
+        dynamicFields: device.dynamicFields,
+      },
+      create: {
+        serialNumber: device.serialNumber,
+        tenantId: rootTenant.id,
+        deviceProfileId: device.deviceProfileId,
+        status: DeviceStatus.WAREHOUSE,
+        dynamicFields: device.dynamicFields,
+        metadata: {
+          createdBy: 'seed',
+          batchNumber: 'SEED-2024-001',
+        },
+      },
+    });
+    console.log(`   ✓ ${device.serialNumber} (WAREHOUSE)`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 9. Create Global Settings
   // ---------------------------------------------------------------------------
   console.log('\n⚙️  Creating Global Settings...');
 
@@ -525,15 +1011,18 @@ function decode(payload) {
   // ---------------------------------------------------------------------------
   // Summary
   // ---------------------------------------------------------------------------
-  console.log('\n' + '='.repeat(60));
+  console.log('\n' + '='.repeat(70));
   console.log('🎉 Database seed completed successfully!\n');
   console.log('Summary:');
   console.log(`   • Communication Tech Definitions: ${communicationTechFieldDefs.length}`);
   console.log(`   • Root Tenant: ${rootTenant.name}`);
   console.log(`   • Platform Admin: ${adminUser.email}`);
   console.log(`   • Default Password: Admin@123 (CHANGE IN PRODUCTION!)`);
+  console.log(`   • Device Profiles: ${deviceProfiles.length}`);
+  console.log(`   • Meter Profiles: ${meterProfiles.length}`);
+  console.log(`   • Warehouse Devices: ${warehouseDevices.length}`);
   console.log(`   • Global Settings: ${globalSettings.length}`);
-  console.log('='.repeat(60) + '\n');
+  console.log('='.repeat(70) + '\n');
 }
 
 // =============================================================================
@@ -547,4 +1036,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

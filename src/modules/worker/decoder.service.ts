@@ -1,5 +1,7 @@
 // =============================================================================
-// Decoder Service - Safe Execution of Decoder Functions
+// Decoder Service - Refactored for Asset/Device Split
+// =============================================================================
+// NEW: Gets decoder function from DeviceProfile, not MeterProfile
 // =============================================================================
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -23,18 +25,18 @@ export class DecoderService {
 
   /**
    * Execute decoder function for a reading
+   * NOW uses DeviceProfile's decoder, not MeterProfile
    */
   async decode(
-    profileId: string,
-    technology: string,
+    deviceProfileId: string,
     payload: string,
   ): Promise<DecodedReading> {
-    // Get decoder function
-    const decoder = await this.getDecoderFunction(profileId, technology);
+    // Get decoder function from DeviceProfile
+    const decoder = await this.getDecoderFunction(deviceProfileId);
 
     if (!decoder) {
       // No decoder found - try to parse as simple hex value
-      this.logger.warn(`No decoder found for profile ${profileId}, technology ${technology}`);
+      this.logger.warn(`No decoder found for device profile ${deviceProfileId}`);
       return this.defaultDecode(payload);
     }
 
@@ -50,13 +52,31 @@ export class DecoderService {
   }
 
   /**
-   * Get decoder function from cache or database
+   * Execute decoder with pre-fetched decoder code (for performance)
    */
-  private async getDecoderFunction(
-    profileId: string,
-    technology: string,
-  ): Promise<string | null> {
-    const cacheKey = `${profileId}:${technology}`;
+  async decodeWithFunction(
+    decoderCode: string,
+    payload: string,
+  ): Promise<DecodedReading> {
+    if (!decoderCode) {
+      return this.defaultDecode(payload);
+    }
+
+    try {
+      const result = await this.executeDecoder(decoderCode, payload);
+      return this.validateDecodedResult(result);
+    } catch (error) {
+      this.logger.error(`Decoder execution failed: ${error.message}`);
+      return this.defaultDecode(payload);
+    }
+  }
+
+  /**
+   * Get decoder function from cache or database
+   * NOW queries DeviceProfile instead of MeterProfile
+   */
+  private async getDecoderFunction(deviceProfileId: string): Promise<string | null> {
+    const cacheKey = deviceProfileId;
 
     // Check in-memory cache first
     const cached = this.decoderCache.get(cacheKey);
@@ -65,40 +85,34 @@ export class DecoderService {
     }
 
     // Check Redis cache
-    const redisKey = CACHE_KEYS.DECODER_FUNCTION(`${profileId}:${technology}`);
+    const redisKey = CACHE_KEYS.DECODER_FUNCTION(deviceProfileId);
     const redisValue = await this.redisService.get(redisKey);
     if (redisValue) {
       this.cacheDecoder(cacheKey, redisValue);
       return redisValue;
     }
 
-    // Fetch from database
-    const profile = await this.prisma.meterProfile.findUnique({
-      where: { id: profileId },
-      select: { communicationConfigs: true },
+    // Fetch from database - DeviceProfile
+    const deviceProfile = await this.prisma.deviceProfile.findUnique({
+      where: { id: deviceProfileId },
+      select: { decoderFunction: true },
     });
 
-    if (!profile || !profile.communicationConfigs) {
-      return null;
-    }
-
-    // Find config for this technology
-    const configs = profile.communicationConfigs as any[];
-    const techConfig = configs.find(
-      (c: any) => c.technology === technology,
-    );
-
-    if (!techConfig || !techConfig.decoder) {
+    if (!deviceProfile || !deviceProfile.decoderFunction) {
       return null;
     }
 
     // Cache in Redis
-    await this.redisService.set(redisKey, techConfig.decoder, CACHE_TTL.MEDIUM);
+    await this.redisService.set(
+      redisKey,
+      deviceProfile.decoderFunction,
+      CACHE_TTL.MEDIUM,
+    );
 
     // Cache in memory
-    this.cacheDecoder(cacheKey, techConfig.decoder);
+    this.cacheDecoder(cacheKey, deviceProfile.decoderFunction);
 
-    return techConfig.decoder;
+    return deviceProfile.decoderFunction;
   }
 
   /**
@@ -235,4 +249,3 @@ export class DecoderService {
     this.logger.log('Decoder cache cleared');
   }
 }
-

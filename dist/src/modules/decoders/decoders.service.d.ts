@@ -7,18 +7,16 @@ export interface DecoderData {
     description: string | null;
     technology: string;
     functionCode: string;
-    version: number;
-    isActive: boolean;
     testPayload: string | null;
     expectedOutput: Record<string, unknown> | null;
     lastTestedAt: Date | null;
     lastTestSucceeded: boolean | null;
-    profileId: string | null;
-    profile: {
+    deviceProfileId: string;
+    deviceProfile: {
         id: string;
         brand: string;
         modelCode: string;
-    } | null;
+    };
 }
 export interface PaginatedDecoders {
     data: DecoderData[];
@@ -33,12 +31,12 @@ export interface DecodersQueryParams {
     page?: number;
     limit?: number;
     technology?: string;
-    isActive?: boolean;
+    brand?: string;
 }
 export declare class DecodersService {
     private readonly prisma;
     private readonly logger;
     constructor(prisma: PrismaService);
     getDecoders(params: DecodersQueryParams): Promise<PaginatedDecoders>;
-    private mapDecoder;
+    getDecoder(deviceProfileId: string): Promise<DecoderData | null>;
 }

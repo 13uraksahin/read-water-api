@@ -142,9 +142,16 @@ __decorate([
 exports.RealtimeGateway = RealtimeGateway = RealtimeGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         cors: {
-            origin: '*',
+            origin: [
+                'http://localhost:3000',
+                'https://read-water-app.portall.com.tr',
+                ...(process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()) || []),
+            ],
+            credentials: true,
         },
         namespace: '/realtime',
+        transports: ['websocket', 'polling'],
+        allowUpgrades: true,
     }),
     __metadata("design:paramtypes", [jwt_1.JwtService,
         config_1.ConfigService,

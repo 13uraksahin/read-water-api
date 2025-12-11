@@ -15,6 +15,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../core/prisma/prisma.service");
 const kysely_service_1 = require("../../../core/kysely/kysely.service");
 const constants_1 = require("../../../common/constants");
+const client_1 = require("@prisma/client");
 let MetersService = MetersService_1 = class MetersService {
     prisma;
     kysely;
@@ -46,25 +47,20 @@ let MetersService = MetersService_1 = class MetersService {
         if (!profile) {
             throw new common_1.NotFoundException('Meter profile not found');
         }
-        if (dto.connectivityConfig) {
-            await this.validateConnectivityConfig(dto.connectivityConfig, profile);
-        }
         const existingMeter = await this.prisma.meter.findUnique({
             where: { serialNumber: dto.serialNumber },
         });
         if (existingMeter) {
             throw new common_1.BadRequestException(`Meter with serial number ${dto.serialNumber} already exists`);
         }
-        if (dto.customerId) {
-            const customer = await this.prisma.customer.findFirst({
-                where: {
-                    id: dto.customerId,
-                    tenantId: dto.tenantId,
-                },
-            });
-            if (!customer) {
-                throw new common_1.NotFoundException('Customer not found or does not belong to this tenant');
-            }
+        const customer = await this.prisma.customer.findFirst({
+            where: {
+                id: dto.customerId,
+                tenantId: dto.tenantId,
+            },
+        });
+        if (!customer) {
+            throw new common_1.NotFoundException('Customer not found or does not belong to this tenant');
         }
         const meter = await this.prisma.meter.create({
             data: {
@@ -75,7 +71,6 @@ let MetersService = MetersService_1 = class MetersService {
                 initialIndex: dto.initialIndex || 0,
                 installationDate: new Date(dto.installationDate),
                 status: dto.status || 'WAREHOUSE',
-                connectivityConfig: dto.connectivityConfig || {},
                 address: dto.address,
                 addressCode: dto.addressCode,
                 latitude: dto.latitude,
@@ -91,6 +86,9 @@ let MetersService = MetersService_1 = class MetersService {
                 },
                 meterProfile: {
                     select: { id: true, brand: true, modelCode: true, meterType: true },
+                },
+                activeDevice: {
+                    select: { id: true, serialNumber: true, status: true },
                 },
             },
         });
@@ -146,6 +144,18 @@ let MetersService = MetersService_1 = class MetersService {
                     meterProfile: {
                         select: { id: true, brand: true, modelCode: true, meterType: true },
                     },
+                    activeDevice: {
+                        select: {
+                            id: true,
+                            serialNumber: true,
+                            status: true,
+                            lastSignalStrength: true,
+                            lastBatteryLevel: true,
+                            deviceProfile: {
+                                select: { brand: true, modelCode: true, communicationTechnology: true },
+                            },
+                        },
+                    },
                 },
             }),
             this.prisma.meter.count({ where: whereClause }),
@@ -171,6 +181,11 @@ let MetersService = MetersService_1 = class MetersService {
                 },
                 customer: true,
                 meterProfile: true,
+                activeDevice: {
+                    include: {
+                        deviceProfile: true,
+                    },
+                },
                 alarms: {
                     where: { status: 'ACTIVE' },
                     take: 5,
@@ -194,12 +209,6 @@ let MetersService = MetersService_1 = class MetersService {
     }
     async update(id, dto, user) {
         const meter = await this.findOne(id, user);
-        if (dto.connectivityConfig) {
-            const profile = await this.prisma.meterProfile.findUnique({
-                where: { id: dto.meterProfileId || meter.meterProfileId },
-            });
-            await this.validateConnectivityConfig(dto.connectivityConfig, profile);
-        }
         if (dto.serialNumber && dto.serialNumber !== meter.serialNumber) {
             const existingMeter = await this.prisma.meter.findUnique({
                 where: { serialNumber: dto.serialNumber },
@@ -216,7 +225,6 @@ let MetersService = MetersService_1 = class MetersService {
                 serialNumber: dto.serialNumber,
                 status: dto.status,
                 valveStatus: dto.valveStatus,
-                connectivityConfig: dto.connectivityConfig,
                 address: dto.address,
                 addressCode: dto.addressCode,
                 latitude: dto.latitude,
@@ -233,6 +241,9 @@ let MetersService = MetersService_1 = class MetersService {
                 meterProfile: {
                     select: { id: true, brand: true, modelCode: true },
                 },
+                activeDevice: {
+                    select: { id: true, serialNumber: true, status: true },
+                },
             },
         });
         this.logger.log(`Updated meter: ${updated.serialNumber}`);
@@ -246,10 +257,122 @@ let MetersService = MetersService_1 = class MetersService {
         if (readingCount > 0) {
             throw new common_1.BadRequestException(`Cannot delete meter with ${readingCount} readings. Consider changing status to PASSIVE instead.`);
         }
+        if (meter.activeDeviceId) {
+            await this.prisma.device.update({
+                where: { id: meter.activeDeviceId },
+                data: { status: client_1.DeviceStatus.WAREHOUSE },
+            });
+        }
         await this.prisma.meter.delete({
             where: { id },
         });
         this.logger.log(`Deleted meter: ${meter.serialNumber}`);
+    }
+    async linkDevice(meterId, dto, user) {
+        const meter = await this.findOne(meterId, user);
+        if (meter.activeDeviceId) {
+            throw new common_1.ConflictException('Meter already has an active device. Unlink first.');
+        }
+        const device = await this.prisma.device.findUnique({
+            where: { id: dto.deviceId },
+            include: {
+                tenant: true,
+                deviceProfile: {
+                    include: {
+                        compatibleMeterProfiles: {
+                            where: { id: meter.meterProfileId },
+                        },
+                    },
+                },
+            },
+        });
+        if (!device) {
+            throw new common_1.NotFoundException('Device not found');
+        }
+        if (device.status !== client_1.DeviceStatus.WAREHOUSE) {
+            throw new common_1.BadRequestException(`Device is not available. Current status: ${device.status}`);
+        }
+        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            if (!device.tenant.path.startsWith(user.tenantPath)) {
+                throw new common_1.ForbiddenException('Device does not belong to your tenant');
+            }
+        }
+        if (device.deviceProfile.compatibleMeterProfiles.length === 0) {
+            throw new common_1.BadRequestException(`Device profile ${device.deviceProfile.brand} ${device.deviceProfile.modelCode} is not compatible with meter profile`);
+        }
+        const updated = await this.prisma.$transaction(async (tx) => {
+            await tx.device.update({
+                where: { id: dto.deviceId },
+                data: { status: client_1.DeviceStatus.DEPLOYED },
+            });
+            const updatedMeter = await tx.meter.update({
+                where: { id: meterId },
+                data: { activeDeviceId: dto.deviceId },
+                include: {
+                    tenant: { select: { id: true, name: true } },
+                    customer: { select: { id: true, details: true } },
+                    meterProfile: { select: { id: true, brand: true, modelCode: true } },
+                    activeDevice: {
+                        include: { deviceProfile: true },
+                    },
+                },
+            });
+            await tx.activityLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'meter.link_device',
+                    resource: 'meter',
+                    resourceId: meterId,
+                    details: {
+                        deviceId: dto.deviceId,
+                        deviceSerial: device.serialNumber,
+                        meterSerial: meter.serialNumber,
+                    },
+                },
+            });
+            return updatedMeter;
+        });
+        this.logger.log(`Linked device ${device.serialNumber} to meter ${meter.serialNumber}`);
+        return updated;
+    }
+    async unlinkDevice(meterId, dto, user) {
+        const meter = await this.findOne(meterId, user);
+        if (!meter.activeDeviceId) {
+            throw new common_1.BadRequestException('Meter has no active device to unlink');
+        }
+        const deviceId = meter.activeDeviceId;
+        const newStatus = dto.deviceStatus || 'WAREHOUSE';
+        const updated = await this.prisma.$transaction(async (tx) => {
+            await tx.device.update({
+                where: { id: deviceId },
+                data: { status: newStatus },
+            });
+            const updatedMeter = await tx.meter.update({
+                where: { id: meterId },
+                data: { activeDeviceId: null },
+                include: {
+                    tenant: { select: { id: true, name: true } },
+                    customer: { select: { id: true, details: true } },
+                    meterProfile: { select: { id: true, brand: true, modelCode: true } },
+                },
+            });
+            await tx.activityLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'meter.unlink_device',
+                    resource: 'meter',
+                    resourceId: meterId,
+                    details: {
+                        deviceId,
+                        newDeviceStatus: newStatus,
+                        meterSerial: meter.serialNumber,
+                    },
+                },
+            });
+            return updatedMeter;
+        });
+        this.logger.log(`Unlinked device from meter ${meter.serialNumber}`);
+        return updated;
     }
     async controlValve(id, dto, user) {
         const meter = await this.findOne(id, user);
@@ -270,41 +393,6 @@ let MetersService = MetersService_1 = class MetersService {
         const startTime = new Date();
         startTime.setDate(startTime.getDate() - days);
         return this.kysely.getHourlyConsumption(id, startTime, new Date());
-    }
-    async validateConnectivityConfig(config, profile) {
-        const profileConfigs = profile.communicationConfigs || [];
-        const validateFields = async (connConfig, type) => {
-            if (!connConfig)
-                return;
-            const techConfig = profileConfigs.find((c) => c.technology === connConfig.technology);
-            if (!techConfig) {
-                throw new common_1.BadRequestException(`Technology ${connConfig.technology} not supported by this profile`);
-            }
-            const fieldDefs = await this.prisma.communicationTechFieldDef.findUnique({
-                where: { technology: connConfig.technology },
-            });
-            if (fieldDefs) {
-                const fields = fieldDefs.fields;
-                for (const fieldDef of fields) {
-                    if (fieldDef.required && !connConfig.fields?.[fieldDef.name]) {
-                        throw new common_1.BadRequestException(`${type} connectivity: ${fieldDef.name} is required for ${connConfig.technology}`);
-                    }
-                    if (connConfig.fields?.[fieldDef.name] && fieldDef.regex) {
-                        const regex = new RegExp(fieldDef.regex);
-                        if (!regex.test(connConfig.fields[fieldDef.name])) {
-                            throw new common_1.BadRequestException(`${type} connectivity: ${fieldDef.name} has invalid format`);
-                        }
-                    }
-                }
-            }
-        };
-        await validateFields(config.primary, 'Primary');
-        await validateFields(config.secondary, 'Secondary');
-        if (config.others) {
-            for (let i = 0; i < config.others.length; i++) {
-                await validateFields(config.others[i], `Other[${i}]`);
-            }
-        }
     }
 };
 exports.MetersService = MetersService;
