@@ -5,5 +5,13 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/../src/$1"
+  },
+  "testTimeout": 30000,
+  "maxWorkers": 1,
+  "verbose": true,
+  "detectOpenHandles": true,
+  "forceExit": true
 }

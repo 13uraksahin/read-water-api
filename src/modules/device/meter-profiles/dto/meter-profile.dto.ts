@@ -218,7 +218,7 @@ export class UpdateMeterProfileDto {
   specifications?: Record<string, any>;
 }
 
-export class ProfileQueryDto {
+export class MeterProfileQueryDto {
   @IsNumber()
   @IsOptional()
   @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
@@ -249,3 +249,4 @@ export class ProfileQueryDto {
   @IsOptional()
   sortOrder?: 'asc' | 'desc';
 }
+

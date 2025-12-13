@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var _a, _b, _c;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BulkCreateDeviceDto = exports.DeviceQueryDto = exports.UpdateDeviceDto = exports.CreateDeviceDto = void 0;
 const class_validator_1 = require("class-validator");
@@ -40,7 +41,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DeviceStatus),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_a = typeof client_1.DeviceStatus !== "undefined" && client_1.DeviceStatus) === "function" ? _a : Object)
 ], CreateDeviceDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
@@ -63,7 +64,7 @@ exports.UpdateDeviceDto = UpdateDeviceDto;
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DeviceStatus),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_b = typeof client_1.DeviceStatus !== "undefined" && client_1.DeviceStatus) === "function" ? _b : Object)
 ], UpdateDeviceDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
@@ -125,7 +126,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DeviceStatus),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_c = typeof client_1.DeviceStatus !== "undefined" && client_1.DeviceStatus) === "function" ? _c : Object)
 ], DeviceQueryDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),

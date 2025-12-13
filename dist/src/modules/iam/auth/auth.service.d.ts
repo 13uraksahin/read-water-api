@@ -15,20 +15,15 @@ export declare class AuthService {
     refreshToken(dto: RefreshTokenDto): Promise<AuthResponseDto>;
     logout(userId: string, refreshToken?: string): Promise<void>;
     getCurrentUser(userId: string): Promise<{
-        id: string;
-        email: string;
-        firstName: string;
-        lastName: string;
-        phone: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        lastLoginAt: Date | null;
-        tenants: {
-            tenantId: string;
-            tenantName: string;
-            tenantPath: string;
-            role: import("@prisma/client").$Enums.SystemRole;
-        }[];
+        id: any;
+        email: any;
+        firstName: any;
+        lastName: any;
+        phone: any;
+        isActive: any;
+        createdAt: any;
+        lastLoginAt: any;
+        tenants: any;
     }>;
     changePassword(userId: string, dto: ChangePasswordDto): Promise<void>;
     private generateTokens;

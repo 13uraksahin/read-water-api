@@ -15,7 +15,7 @@ let DeviceProfilesModule = class DeviceProfilesModule {
 exports.DeviceProfilesModule = DeviceProfilesModule;
 exports.DeviceProfilesModule = DeviceProfilesModule = __decorate([
     (0, common_1.Module)({
-        controllers: [device_profiles_controller_1.DeviceProfilesController],
+        controllers: [device_profiles_controller_1.DeviceProfilesController, device_profiles_controller_1.DecodersController],
         providers: [device_profiles_service_1.DeviceProfilesService],
         exports: [device_profiles_service_1.DeviceProfilesService],
     })

@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var _a, _b, _c, _d, _e, _f, _g;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DeviceProfileQueryDto = exports.UpdateDeviceProfileDto = exports.CreateDeviceProfileDto = exports.FieldDefinitionDto = void 0;
 const class_validator_1 = require("class-validator");
@@ -74,7 +75,7 @@ exports.CreateDeviceProfileDto = CreateDeviceProfileDto;
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DeviceBrand),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_a = typeof client_1.DeviceBrand !== "undefined" && client_1.DeviceBrand) === "function" ? _a : Object)
 ], CreateDeviceProfileDto.prototype, "brand", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
@@ -84,12 +85,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_b = typeof client_1.CommunicationTechnology !== "undefined" && client_1.CommunicationTechnology) === "function" ? _b : Object)
 ], CreateDeviceProfileDto.prototype, "communicationTechnology", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.IntegrationType),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_c = typeof client_1.IntegrationType !== "undefined" && client_1.IntegrationType) === "function" ? _c : Object)
 ], CreateDeviceProfileDto.prototype, "integrationType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -146,12 +147,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_d = typeof client_1.CommunicationTechnology !== "undefined" && client_1.CommunicationTechnology) === "function" ? _d : Object)
 ], UpdateDeviceProfileDto.prototype, "communicationTechnology", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.IntegrationType),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_e = typeof client_1.IntegrationType !== "undefined" && client_1.IntegrationType) === "function" ? _e : Object)
 ], UpdateDeviceProfileDto.prototype, "integrationType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -215,12 +216,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.DeviceBrand),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_f = typeof client_1.DeviceBrand !== "undefined" && client_1.DeviceBrand) === "function" ? _f : Object)
 ], DeviceProfileQueryDto.prototype, "brand", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
-    __metadata("design:type", String)
+    __metadata("design:type", typeof (_g = typeof client_1.CommunicationTechnology !== "undefined" && client_1.CommunicationTechnology) === "function" ? _g : Object)
 ], DeviceProfileQueryDto.prototype, "technology", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),

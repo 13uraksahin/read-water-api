@@ -9,7 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DeviceModule = void 0;
 const common_1 = require("@nestjs/common");
 const meters_module_1 = require("./meters/meters.module");
-const profiles_module_1 = require("./profiles/profiles.module");
+const meter_profiles_module_1 = require("./meter-profiles/meter-profiles.module");
 const devices_module_1 = require("./devices/devices.module");
 const device_profiles_module_1 = require("./device-profiles/device-profiles.module");
 let DeviceModule = class DeviceModule {
@@ -17,8 +17,8 @@ let DeviceModule = class DeviceModule {
 exports.DeviceModule = DeviceModule;
 exports.DeviceModule = DeviceModule = __decorate([
     (0, common_1.Module)({
-        imports: [meters_module_1.MetersModule, profiles_module_1.ProfilesModule, devices_module_1.DevicesModule, device_profiles_module_1.DeviceProfilesModule],
-        exports: [meters_module_1.MetersModule, profiles_module_1.ProfilesModule, devices_module_1.DevicesModule, device_profiles_module_1.DeviceProfilesModule],
+        imports: [meters_module_1.MetersModule, meter_profiles_module_1.MeterProfilesModule, devices_module_1.DevicesModule, device_profiles_module_1.DeviceProfilesModule],
+        exports: [meters_module_1.MetersModule, meter_profiles_module_1.MeterProfilesModule, devices_module_1.DevicesModule, device_profiles_module_1.DeviceProfilesModule],
     })
 ], DeviceModule);
 //# sourceMappingURL=device.module.js.map

@@ -8,17 +8,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var ProfilesService_1;
+var MeterProfilesService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ProfilesService = void 0;
+exports.MeterProfilesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../core/prisma/prisma.service");
 const redis_service_1 = require("../../../core/redis/redis.service");
 const constants_1 = require("../../../common/constants");
-let ProfilesService = ProfilesService_1 = class ProfilesService {
+let MeterProfilesService = MeterProfilesService_1 = class MeterProfilesService {
     prisma;
     redisService;
-    logger = new common_1.Logger(ProfilesService_1.name);
+    logger = new common_1.Logger(MeterProfilesService_1.name);
     constructor(prisma, redisService) {
         this.prisma = prisma;
         this.redisService = redisService;
@@ -245,10 +245,10 @@ let ProfilesService = ProfilesService_1 = class ProfilesService {
         });
     }
 };
-exports.ProfilesService = ProfilesService;
-exports.ProfilesService = ProfilesService = ProfilesService_1 = __decorate([
+exports.MeterProfilesService = MeterProfilesService;
+exports.MeterProfilesService = MeterProfilesService = MeterProfilesService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         redis_service_1.RedisService])
-], ProfilesService);
-//# sourceMappingURL=profiles.service.js.map
+], MeterProfilesService);
+//# sourceMappingURL=meter-profiles.service.js.map

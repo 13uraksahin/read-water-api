@@ -6,18 +6,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DecodersModule = void 0;
+exports.MeterProfilesModule = void 0;
 const common_1 = require("@nestjs/common");
-const decoders_controller_1 = require("./decoders.controller");
-const decoders_service_1 = require("./decoders.service");
-let DecodersModule = class DecodersModule {
+const meter_profiles_service_1 = require("./meter-profiles.service");
+const meter_profiles_controller_1 = require("./meter-profiles.controller");
+let MeterProfilesModule = class MeterProfilesModule {
 };
-exports.DecodersModule = DecodersModule;
-exports.DecodersModule = DecodersModule = __decorate([
+exports.MeterProfilesModule = MeterProfilesModule;
+exports.MeterProfilesModule = MeterProfilesModule = __decorate([
     (0, common_1.Module)({
-        controllers: [decoders_controller_1.DecodersController],
-        providers: [decoders_service_1.DecodersService],
-        exports: [decoders_service_1.DecodersService],
+        controllers: [meter_profiles_controller_1.MeterProfilesController],
+        providers: [meter_profiles_service_1.MeterProfilesService],
+        exports: [meter_profiles_service_1.MeterProfilesService],
     })
-], DecodersModule);
-//# sourceMappingURL=decoders.module.js.map
+], MeterProfilesModule);
+//# sourceMappingURL=meter-profiles.module.js.map

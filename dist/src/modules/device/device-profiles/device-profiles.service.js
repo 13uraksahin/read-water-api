@@ -229,6 +229,111 @@ let DeviceProfilesService = DeviceProfilesService_1 = class DeviceProfilesServic
             return { success: false, error: error.message };
         }
     }
+    async getDecoders(params) {
+        const page = params.page ?? 1;
+        const limit = Math.min(params.limit ?? 30, 100);
+        const skip = (page - 1) * limit;
+        const where = {
+            decoderFunction: { not: null },
+        };
+        if (params.technology) {
+            where.communicationTechnology = params.technology;
+        }
+        if (params.brand) {
+            where.brand = params.brand;
+        }
+        const [total, deviceProfiles] = await Promise.all([
+            this.prisma.deviceProfile.count({ where }),
+            this.prisma.deviceProfile.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+                select: {
+                    id: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    brand: true,
+                    modelCode: true,
+                    communicationTechnology: true,
+                    decoderFunction: true,
+                    testPayload: true,
+                    expectedOutput: true,
+                    lastTestedAt: true,
+                    lastTestSucceeded: true,
+                },
+            }),
+        ]);
+        const totalPages = Math.ceil(total / limit);
+        const decoders = deviceProfiles.map((dp) => ({
+            id: dp.id,
+            createdAt: dp.createdAt,
+            updatedAt: dp.updatedAt,
+            name: `${dp.brand} ${dp.modelCode} Decoder`,
+            description: `Decoder for ${dp.brand} ${dp.modelCode} (${dp.communicationTechnology})`,
+            technology: dp.communicationTechnology,
+            functionCode: dp.decoderFunction || '',
+            testPayload: dp.testPayload,
+            expectedOutput: dp.expectedOutput,
+            lastTestedAt: dp.lastTestedAt,
+            lastTestSucceeded: dp.lastTestSucceeded,
+            deviceProfileId: dp.id,
+            deviceProfile: {
+                id: dp.id,
+                brand: dp.brand,
+                modelCode: dp.modelCode,
+            },
+        }));
+        return {
+            data: decoders,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages,
+            },
+        };
+    }
+    async getDecoder(deviceProfileId) {
+        const dp = await this.prisma.deviceProfile.findUnique({
+            where: { id: deviceProfileId },
+            select: {
+                id: true,
+                createdAt: true,
+                updatedAt: true,
+                brand: true,
+                modelCode: true,
+                communicationTechnology: true,
+                decoderFunction: true,
+                testPayload: true,
+                expectedOutput: true,
+                lastTestedAt: true,
+                lastTestSucceeded: true,
+            },
+        });
+        if (!dp || !dp.decoderFunction) {
+            return null;
+        }
+        return {
+            id: dp.id,
+            createdAt: dp.createdAt,
+            updatedAt: dp.updatedAt,
+            name: `${dp.brand} ${dp.modelCode} Decoder`,
+            description: `Decoder for ${dp.brand} ${dp.modelCode} (${dp.communicationTechnology})`,
+            technology: dp.communicationTechnology,
+            functionCode: dp.decoderFunction,
+            testPayload: dp.testPayload,
+            expectedOutput: dp.expectedOutput,
+            lastTestedAt: dp.lastTestedAt,
+            lastTestSucceeded: dp.lastTestSucceeded,
+            deviceProfileId: dp.id,
+            deviceProfile: {
+                id: dp.id,
+                brand: dp.brand,
+                modelCode: dp.modelCode,
+            },
+        };
+    }
 };
 exports.DeviceProfilesService = DeviceProfilesService;
 exports.DeviceProfilesService = DeviceProfilesService = DeviceProfilesService_1 = __decorate([

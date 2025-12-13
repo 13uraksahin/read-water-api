@@ -12,65 +12,65 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ProfilesController = void 0;
+exports.MeterProfilesController = void 0;
 const common_1 = require("@nestjs/common");
-const profiles_service_1 = require("./profiles.service");
-const profile_dto_1 = require("./dto/profile.dto");
+const meter_profiles_service_1 = require("./meter-profiles.service");
+const meter_profile_dto_1 = require("./dto/meter-profile.dto");
 const jwt_auth_guard_1 = require("../../iam/auth/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../../iam/auth/guards/permissions.guard");
 const decorators_1 = require("../../../common/decorators");
 const constants_1 = require("../../../common/constants");
-let ProfilesController = class ProfilesController {
-    profilesService;
-    constructor(profilesService) {
-        this.profilesService = profilesService;
+let MeterProfilesController = class MeterProfilesController {
+    meterProfilesService;
+    constructor(meterProfilesService) {
+        this.meterProfilesService = meterProfilesService;
     }
     async create(dto) {
-        return this.profilesService.create(dto);
+        return this.meterProfilesService.create(dto);
     }
     async findAll(query) {
-        return this.profilesService.findAll(query);
+        return this.meterProfilesService.findAll(query);
     }
     async getCommunicationTechFields() {
-        return this.profilesService.getCommunicationTechFields();
+        return this.meterProfilesService.getCommunicationTechFields();
     }
     async findOne(id) {
-        return this.profilesService.findOne(id);
+        return this.meterProfilesService.findOne(id);
     }
     async update(id, dto) {
-        return this.profilesService.update(id, dto);
+        return this.meterProfilesService.update(id, dto);
     }
     async patch(id, dto) {
-        return this.profilesService.update(id, dto);
+        return this.meterProfilesService.update(id, dto);
     }
     async delete(id) {
-        await this.profilesService.delete(id);
+        await this.meterProfilesService.delete(id);
     }
 };
-exports.ProfilesController = ProfilesController;
+exports.MeterProfilesController = MeterProfilesController;
 __decorate([
     (0, common_1.Post)(),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_CREATE),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [profile_dto_1.CreateMeterProfileDto]),
+    __metadata("design:paramtypes", [meter_profile_dto_1.CreateMeterProfileDto]),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "create", null);
+], MeterProfilesController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [profile_dto_1.ProfileQueryDto]),
+    __metadata("design:paramtypes", [meter_profile_dto_1.MeterProfileQueryDto]),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "findAll", null);
+], MeterProfilesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('communication-tech-fields'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_READ),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "getCommunicationTechFields", null);
+], MeterProfilesController.prototype, "getCommunicationTechFields", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_READ),
@@ -78,25 +78,25 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "findOne", null);
+], MeterProfilesController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Put)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_UPDATE),
     __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, profile_dto_1.UpdateMeterProfileDto]),
+    __metadata("design:paramtypes", [String, meter_profile_dto_1.UpdateMeterProfileDto]),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "update", null);
+], MeterProfilesController.prototype, "update", null);
 __decorate([
     (0, common_1.Patch)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_UPDATE),
     __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, profile_dto_1.UpdateMeterProfileDto]),
+    __metadata("design:paramtypes", [String, meter_profile_dto_1.UpdateMeterProfileDto]),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "patch", null);
+], MeterProfilesController.prototype, "patch", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_DELETE),
@@ -105,10 +105,10 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
-], ProfilesController.prototype, "delete", null);
-exports.ProfilesController = ProfilesController = __decorate([
+], MeterProfilesController.prototype, "delete", null);
+exports.MeterProfilesController = MeterProfilesController = __decorate([
     (0, common_1.Controller)('profiles'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    __metadata("design:paramtypes", [profiles_service_1.ProfilesService])
-], ProfilesController);
-//# sourceMappingURL=profiles.controller.js.map
+    __metadata("design:paramtypes", [meter_profiles_service_1.MeterProfilesService])
+], MeterProfilesController);
+//# sourceMappingURL=meter-profiles.controller.js.map

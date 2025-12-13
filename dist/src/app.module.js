@@ -20,7 +20,6 @@ const realtime_module_1 = require("./modules/realtime/realtime.module");
 const dashboard_module_1 = require("./modules/dashboard/dashboard.module");
 const readings_module_1 = require("./modules/readings/readings.module");
 const customers_module_1 = require("./modules/customers/customers.module");
-const decoders_module_1 = require("./modules/decoders/decoders.module");
 const settings_module_1 = require("./modules/settings/settings.module");
 const alarms_module_1 = require("./modules/alarms/alarms.module");
 const jwt_auth_guard_1 = require("./modules/iam/auth/guards/jwt-auth.guard");
@@ -65,7 +64,6 @@ exports.AppModule = AppModule = __decorate([
             dashboard_module_1.DashboardModule,
             readings_module_1.ReadingsModule,
             customers_module_1.CustomersModule,
-            decoders_module_1.DecodersModule,
             settings_module_1.SettingsModule,
             alarms_module_1.AlarmsModule,
         ],

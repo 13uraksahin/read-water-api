@@ -19,9 +19,9 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReadingsModule } from './modules/readings/readings.module';
 import { CustomersModule } from './modules/customers/customers.module';
-import { DecodersModule } from './modules/decoders/decoders.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AlarmsModule } from './modules/alarms/alarms.module';
+// Note: DecodersModule removed - decoder logic merged into DeviceProfilesModule
 
 // Guards
 import { JwtAuthGuard } from './modules/iam/auth/guards/jwt-auth.guard';
@@ -68,7 +68,6 @@ import { JwtAuthGuard } from './modules/iam/auth/guards/jwt-auth.guard';
     DashboardModule,
     ReadingsModule,
     CustomersModule,
-    DecodersModule,
     SettingsModule,
     AlarmsModule,
   ],

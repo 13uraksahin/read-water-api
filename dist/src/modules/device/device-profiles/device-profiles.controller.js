@@ -12,7 +12,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DeviceProfilesController = void 0;
+exports.DecodersController = exports.DeviceProfilesController = void 0;
 const common_1 = require("@nestjs/common");
 const device_profiles_service_1 = require("./device-profiles.service");
 const device_profile_dto_1 = require("./dto/device-profile.dto");
@@ -113,4 +113,44 @@ exports.DeviceProfilesController = DeviceProfilesController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     __metadata("design:paramtypes", [device_profiles_service_1.DeviceProfilesService])
 ], DeviceProfilesController);
+let DecodersController = class DecodersController {
+    deviceProfilesService;
+    constructor(deviceProfilesService) {
+        this.deviceProfilesService = deviceProfilesService;
+    }
+    async getDecoders(page, limit, technology, brand) {
+        return this.deviceProfilesService.getDecoders({
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            technology,
+            brand,
+        });
+    }
+    async getDecoder(id) {
+        return this.deviceProfilesService.getDecoder(id);
+    }
+};
+exports.DecodersController = DecodersController;
+__decorate([
+    (0, common_1.Get)(),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('technology')),
+    __param(3, (0, common_1.Query)('brand')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:returntype", Promise)
+], DecodersController.prototype, "getDecoders", null);
+__decorate([
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], DecodersController.prototype, "getDecoder", null);
+exports.DecodersController = DecodersController = __decorate([
+    (0, common_1.Controller)('decoders'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __metadata("design:paramtypes", [device_profiles_service_1.DeviceProfilesService])
+], DecodersController);
 //# sourceMappingURL=device-profiles.controller.js.map

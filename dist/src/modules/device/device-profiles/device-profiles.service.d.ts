@@ -18,4 +18,38 @@ export declare class DeviceProfilesService {
         output?: any;
         error?: string;
     }>;
+    getDecoders(params: {
+        page?: number;
+        limit?: number;
+        technology?: string;
+        brand?: string;
+    }): Promise<{
+        data: DecoderData[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+    }>;
+    getDecoder(deviceProfileId: string): Promise<DecoderData | null>;
+}
+export interface DecoderData {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    description: string | null;
+    technology: string;
+    functionCode: string;
+    testPayload: string | null;
+    expectedOutput: Record<string, unknown> | null;
+    lastTestedAt: Date | null;
+    lastTestSucceeded: boolean | null;
+    deviceProfileId: string;
+    deviceProfile: {
+        id: string;
+        brand: string;
+        modelCode: string;
+    };
 }

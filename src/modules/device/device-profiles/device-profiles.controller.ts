@@ -17,7 +17,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { DeviceProfilesService } from './device-profiles.service';
+import { DeviceProfilesService, DecoderData } from './device-profiles.service';
 import {
   CreateDeviceProfileDto,
   UpdateDeviceProfileDto,
@@ -83,5 +83,39 @@ export class DeviceProfilesController {
     @Body('payload') payload?: string,
   ) {
     return this.deviceProfilesService.testDecoder(id, payload);
+  }
+}
+
+// =============================================================================
+// Decoders Controller (Read-Only)
+// Merged from legacy decoders module - provides a read-only view of decoders
+// that are stored in DeviceProfile entities
+// =============================================================================
+
+@Controller('decoders')
+@UseGuards(JwtAuthGuard)
+export class DecodersController {
+  constructor(private readonly deviceProfilesService: DeviceProfilesService) {}
+
+  @Get()
+  async getDecoders(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('technology') technology?: string,
+    @Query('brand') brand?: string,
+  ) {
+    return this.deviceProfilesService.getDecoders({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      technology,
+      brand,
+    });
+  }
+
+  @Get(':id')
+  async getDecoder(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DecoderData | null> {
+    return this.deviceProfilesService.getDecoder(id);
   }
 }

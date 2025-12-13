@@ -13,14 +13,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { RedisService } from '../../../core/redis/redis.service';
-import { CreateMeterProfileDto, UpdateMeterProfileDto, ProfileQueryDto } from './dto/profile.dto';
+import { CreateMeterProfileDto, UpdateMeterProfileDto, MeterProfileQueryDto } from './dto/meter-profile.dto';
 import { PaginatedResult } from '../../../common/interfaces';
 import { PAGINATION, CACHE_KEYS, CACHE_TTL } from '../../../common/constants';
 import { MeterProfile } from '@prisma/client';
 
 @Injectable()
-export class ProfilesService {
-  private readonly logger = new Logger(ProfilesService.name);
+export class MeterProfilesService {
+  private readonly logger = new Logger(MeterProfilesService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -99,7 +99,7 @@ export class ProfilesService {
   /**
    * Get all profiles with pagination
    */
-  async findAll(query: ProfileQueryDto): Promise<PaginatedResult<MeterProfile>> {
+  async findAll(query: MeterProfileQueryDto): Promise<PaginatedResult<MeterProfile>> {
     const page = query.page || PAGINATION.DEFAULT_PAGE;
     const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
     const skip = (page - 1) * limit;
@@ -308,3 +308,4 @@ export class ProfilesService {
     });
   }
 }
+

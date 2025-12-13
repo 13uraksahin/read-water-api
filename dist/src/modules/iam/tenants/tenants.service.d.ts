@@ -16,22 +16,11 @@ export declare class TenantsService {
     delete(id: string, user: AuthenticatedUser): Promise<void>;
     getStats(id: string, user: AuthenticatedUser): Promise<{
         tenant: {
-            id: string;
-            name: string;
-            path: string;
+            id: any;
+            name: any;
+            path: any;
         };
-        stats: {
-            total_consumption: number;
-            avg_consumption: number;
-            max_consumption: number;
-            min_consumption: number;
-            reading_count: number;
-            active_meters: number;
-            totalMeters: number;
-            totalCustomers: number;
-            activeAlarms: number;
-            childTenants: number;
-        };
+        stats: any;
     }>;
     private hasAccessToTenant;
     private sanitizeForLtree;

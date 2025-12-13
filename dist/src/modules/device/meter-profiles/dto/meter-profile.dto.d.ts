@@ -44,7 +44,7 @@ export declare class UpdateMeterProfileDto {
     compatibleDeviceProfileIds?: string[];
     specifications?: Record<string, any>;
 }
-export declare class ProfileQueryDto {
+export declare class MeterProfileQueryDto {
     page?: number;
     limit?: number;
     brand?: Brand;
