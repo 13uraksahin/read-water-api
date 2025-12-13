@@ -104,5 +104,25 @@ export declare class TenantsController {
         subscriptionPlan: string | null;
         settings: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
+    patch(id: string, dto: UpdateTenantDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        name: string;
+        path: string;
+        parentId: string | null;
+        contactFirstName: string | null;
+        contactLastName: string | null;
+        contactPhone: string | null;
+        contactEmail: string | null;
+        taxId: string | null;
+        taxOffice: string | null;
+        address: import("@prisma/client/runtime/library").JsonValue | null;
+        latitude: import("@prisma/client/runtime/library").Decimal | null;
+        longitude: import("@prisma/client/runtime/library").Decimal | null;
+        subscriptionStatus: import("@prisma/client").$Enums.SubscriptionStatus;
+        subscriptionPlan: string | null;
+        settings: import("@prisma/client/runtime/library").JsonValue | null;
+    }>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
 }

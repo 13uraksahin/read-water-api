@@ -7,6 +7,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -59,6 +60,16 @@ export class UsersController {
   @Put(':id')
   @RequirePermissions(PERMISSIONS.USER_UPDATE)
   async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.update(id, dto, user);
+  }
+
+  @Patch(':id')
+  @RequirePermissions(PERMISSIONS.USER_UPDATE)
+  async patch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: AuthenticatedUser,

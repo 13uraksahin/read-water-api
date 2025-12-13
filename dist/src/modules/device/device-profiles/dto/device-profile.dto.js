@@ -73,6 +73,7 @@ class CreateDeviceProfileDto {
 exports.CreateDeviceProfileDto = CreateDeviceProfileDto;
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DeviceBrand),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateDeviceProfileDto.prototype, "brand", void 0);
 __decorate([
@@ -82,6 +83,7 @@ __decorate([
 ], CreateDeviceProfileDto.prototype, "modelCode", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateDeviceProfileDto.prototype, "communicationTechnology", void 0);
 __decorate([

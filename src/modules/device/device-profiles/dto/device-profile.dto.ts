@@ -50,6 +50,7 @@ export class FieldDefinitionDto {
 
 export class CreateDeviceProfileDto {
   @IsEnum(DeviceBrand)
+  @IsNotEmpty()
   brand: DeviceBrand;
 
   @IsString()
@@ -57,6 +58,7 @@ export class CreateDeviceProfileDto {
   modelCode: string;
 
   @IsEnum(CommunicationTechnology)
+  @IsNotEmpty()
   communicationTechnology: CommunicationTechnology;
 
   @IsOptional()

@@ -9,6 +9,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -78,6 +79,16 @@ export class MetersController {
   @Put(':id')
   @RequirePermissions(PERMISSIONS.METER_UPDATE)
   async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateMeterDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.update(id, dto, user);
+  }
+
+  @Patch(':id')
+  @RequirePermissions(PERMISSIONS.METER_UPDATE)
+  async patch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateMeterDto,
     @CurrentUser() user: AuthenticatedUser,

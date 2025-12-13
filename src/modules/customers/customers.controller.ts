@@ -7,6 +7,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Query,
   Param,
@@ -14,6 +15,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import type { PaginatedCustomers, CustomerData } from './customers.service';
@@ -43,7 +45,7 @@ export class CustomersController {
   }
 
   @Get(':id')
-  async getCustomer(@Param('id') id: string): Promise<CustomerData> {
+  async getCustomer(@Param('id', ParseUUIDPipe) id: string): Promise<CustomerData> {
     return this.customersService.getCustomer(id);
   }
 
@@ -54,7 +56,15 @@ export class CustomersController {
 
   @Put(':id')
   async updateCustomer(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCustomerDto,
+  ): Promise<CustomerData> {
+    return this.customersService.updateCustomer(id, dto);
+  }
+
+  @Patch(':id')
+  async patchCustomer(
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCustomerDto,
   ): Promise<CustomerData> {
     return this.customersService.updateCustomer(id, dto);
@@ -62,7 +72,7 @@ export class CustomersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteCustomer(@Param('id') id: string): Promise<void> {
+  async deleteCustomer(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.customersService.deleteCustomer(id);
   }
 }

@@ -8,5 +8,6 @@ export declare class CustomersController {
     getCustomer(id: string): Promise<CustomerData>;
     createCustomer(dto: CreateCustomerDto): Promise<CustomerData>;
     updateCustomer(id: string, dto: UpdateCustomerDto): Promise<CustomerData>;
+    patchCustomer(id: string, dto: UpdateCustomerDto): Promise<CustomerData>;
     deleteCustomer(id: string): Promise<void>;
 }

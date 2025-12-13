@@ -7,6 +7,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -86,6 +87,16 @@ export class DevicesController {
   @Put(':id')
   @RequirePermissions(PERMISSIONS.DEVICE_UPDATE)
   async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDeviceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.devicesService.update(id, dto, user);
+  }
+
+  @Patch(':id')
+  @RequirePermissions(PERMISSIONS.DEVICE_UPDATE)
+  async patch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDeviceDto,
     @CurrentUser() user: AuthenticatedUser,

@@ -43,6 +43,9 @@ let DevicesController = class DevicesController {
     async update(id, dto, user) {
         return this.devicesService.update(id, dto, user);
     }
+    async patch(id, dto, user) {
+        return this.devicesService.update(id, dto, user);
+    }
     async delete(id, user) {
         await this.devicesService.delete(id, user);
     }
@@ -104,6 +107,16 @@ __decorate([
     __metadata("design:paramtypes", [String, device_dto_1.UpdateDeviceDto, Object]),
     __metadata("design:returntype", Promise)
 ], DevicesController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.DEVICE_UPDATE),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, device_dto_1.UpdateDeviceDto, Object]),
+    __metadata("design:returntype", Promise)
+], DevicesController.prototype, "patch", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.DEVICE_DELETE),

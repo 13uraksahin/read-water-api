@@ -71,6 +71,23 @@ export declare class DeviceProfilesController {
         batteryLifeMonths: number | null;
         specifications: import("@prisma/client/runtime/library").JsonValue | null;
     }>;
+    patch(id: string, dto: UpdateDeviceProfileDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        brand: import("@prisma/client").$Enums.DeviceBrand;
+        modelCode: string;
+        communicationTechnology: import("@prisma/client").$Enums.CommunicationTechnology;
+        integrationType: import("@prisma/client").$Enums.IntegrationType;
+        fieldDefinitions: import("@prisma/client/runtime/library").JsonValue;
+        decoderFunction: string | null;
+        testPayload: string | null;
+        expectedOutput: import("@prisma/client/runtime/library").JsonValue | null;
+        lastTestedAt: Date | null;
+        lastTestSucceeded: boolean | null;
+        batteryLifeMonths: number | null;
+        specifications: import("@prisma/client/runtime/library").JsonValue | null;
+    }>;
     delete(id: string): Promise<void>;
     testDecoder(id: string, payload?: string): Promise<{
         success: boolean;

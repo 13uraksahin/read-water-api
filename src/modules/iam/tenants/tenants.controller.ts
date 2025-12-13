@@ -7,12 +7,15 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
   Query,
   UseGuards,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto, UpdateTenantDto, TenantQueryDto } from './dto/tenant.dto';
@@ -80,7 +83,18 @@ export class TenantsController {
     return this.tenantsService.update(id, dto, user);
   }
 
+  @Patch(':id')
+  @RequirePermissions(PERMISSIONS.TENANT_UPDATE)
+  async patch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateTenantDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tenantsService.update(id, dto, user);
+  }
+
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(SYSTEM_ROLES.PLATFORM_ADMIN)
   async delete(
     @Param('id', ParseUUIDPipe) id: string,

@@ -12,8 +12,11 @@ import {
   IsEnum,
   ValidateNested,
   IsObject,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { SubscriptionStatus } from '@prisma/client';
 
 class AddressDto {
@@ -177,12 +180,17 @@ export class UpdateTenantDto {
 }
 
 export class TenantQueryDto {
-  @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(1)
   page?: number;
 
-  @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit?: number;
 
   @IsString()

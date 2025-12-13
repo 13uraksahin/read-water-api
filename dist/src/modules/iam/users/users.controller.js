@@ -37,6 +37,9 @@ let UsersController = class UsersController {
     async update(id, dto, user) {
         return this.usersService.update(id, dto, user);
     }
+    async patch(id, dto, user) {
+        return this.usersService.update(id, dto, user);
+    }
     async delete(id, user) {
         await this.usersService.delete(id, user);
     }
@@ -85,6 +88,16 @@ __decorate([
     __metadata("design:paramtypes", [String, user_dto_1.UpdateUserDto, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.USER_UPDATE),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, user_dto_1.UpdateUserDto, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "patch", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.USER_DELETE),

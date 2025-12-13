@@ -16,14 +16,14 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
-        customerId: string;
-        meterProfileId: string;
-        activeDeviceId: string | null;
     }>;
     findAll(query: MeterQueryDto, user: AuthenticatedUser): Promise<import("../../../common/interfaces").PaginatedResult<{
         id: string;
@@ -37,14 +37,14 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
-        customerId: string;
-        meterProfileId: string;
-        activeDeviceId: string | null;
     }>>;
     findOne(id: string, user: AuthenticatedUser): Promise<{
         id: string;
@@ -58,14 +58,14 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
-        customerId: string;
-        meterProfileId: string;
-        activeDeviceId: string | null;
     }>;
     getReadingHistory(id: string, days: number, user: AuthenticatedUser): Promise<{
         bucket: Date;
@@ -85,14 +85,35 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
+    }>;
+    patch(id: string, dto: UpdateMeterDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        address: import("@prisma/client/runtime/library").JsonValue;
+        latitude: import("@prisma/client/runtime/library").Decimal | null;
+        longitude: import("@prisma/client/runtime/library").Decimal | null;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.MeterStatus;
+        addressCode: string | null;
+        activeDeviceId: string | null;
         customerId: string;
         meterProfileId: string;
-        activeDeviceId: string | null;
+        initialIndex: import("@prisma/client/runtime/library").Decimal;
+        installationDate: Date;
+        valveStatus: import("@prisma/client").$Enums.ValveStatus;
+        lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
+        lastReadingTime: Date | null;
     }>;
     linkDevice(id: string, dto: LinkDeviceDto, user: AuthenticatedUser): Promise<{
         id: string;
@@ -106,14 +127,14 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
-        customerId: string;
-        meterProfileId: string;
-        activeDeviceId: string | null;
     }>;
     unlinkDevice(id: string, dto: UnlinkDeviceDto, user: AuthenticatedUser): Promise<{
         id: string;
@@ -127,14 +148,14 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
-        customerId: string;
-        meterProfileId: string;
-        activeDeviceId: string | null;
     }>;
     controlValve(id: string, dto: ControlValveDto, user: AuthenticatedUser): Promise<{
         id: string;
@@ -148,14 +169,14 @@ export declare class MetersController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.MeterStatus;
         addressCode: string | null;
+        activeDeviceId: string | null;
+        customerId: string;
+        meterProfileId: string;
         initialIndex: import("@prisma/client/runtime/library").Decimal;
         installationDate: Date;
         valveStatus: import("@prisma/client").$Enums.ValveStatus;
         lastReadingValue: import("@prisma/client/runtime/library").Decimal | null;
         lastReadingTime: Date | null;
-        customerId: string;
-        meterProfileId: string;
-        activeDeviceId: string | null;
     }>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
 }

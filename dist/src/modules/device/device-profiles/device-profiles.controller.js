@@ -37,6 +37,9 @@ let DeviceProfilesController = class DeviceProfilesController {
     async update(id, dto) {
         return this.deviceProfilesService.update(id, dto);
     }
+    async patch(id, dto) {
+        return this.deviceProfilesService.update(id, dto);
+    }
     async delete(id) {
         await this.deviceProfilesService.delete(id);
     }
@@ -78,6 +81,15 @@ __decorate([
     __metadata("design:paramtypes", [String, device_profile_dto_1.UpdateDeviceProfileDto]),
     __metadata("design:returntype", Promise)
 ], DeviceProfilesController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_UPDATE),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, device_profile_dto_1.UpdateDeviceProfileDto]),
+    __metadata("design:returntype", Promise)
+], DeviceProfilesController.prototype, "patch", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_DELETE),

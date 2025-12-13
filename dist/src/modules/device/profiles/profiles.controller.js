@@ -40,6 +40,9 @@ let ProfilesController = class ProfilesController {
     async update(id, dto) {
         return this.profilesService.update(id, dto);
     }
+    async patch(id, dto) {
+        return this.profilesService.update(id, dto);
+    }
     async delete(id) {
         await this.profilesService.delete(id);
     }
@@ -85,6 +88,15 @@ __decorate([
     __metadata("design:paramtypes", [String, profile_dto_1.UpdateMeterProfileDto]),
     __metadata("design:returntype", Promise)
 ], ProfilesController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_UPDATE),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, profile_dto_1.UpdateMeterProfileDto]),
+    __metadata("design:returntype", Promise)
+], ProfilesController.prototype, "patch", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.PROFILE_DELETE),

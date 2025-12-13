@@ -111,5 +111,30 @@ export declare class ProfilesController {
         ipRating: import("@prisma/client").$Enums.IPRating | null;
         communicationModule: import("@prisma/client").$Enums.CommunicationModule;
     }>;
+    patch(id: string, dto: UpdateMeterProfileDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        length: number | null;
+        brand: import("@prisma/client").$Enums.Brand;
+        modelCode: string;
+        specifications: import("@prisma/client/runtime/library").JsonValue | null;
+        meterType: import("@prisma/client").$Enums.MeterType;
+        dialType: import("@prisma/client").$Enums.DialType;
+        connectionType: import("@prisma/client").$Enums.ConnectionType;
+        mountingType: import("@prisma/client").$Enums.MountingType;
+        temperatureType: import("@prisma/client").$Enums.TemperatureType;
+        diameter: number | null;
+        width: number | null;
+        height: number | null;
+        q1: import("@prisma/client/runtime/library").Decimal | null;
+        q2: import("@prisma/client/runtime/library").Decimal | null;
+        q3: import("@prisma/client/runtime/library").Decimal | null;
+        q4: import("@prisma/client/runtime/library").Decimal | null;
+        rValue: import("@prisma/client/runtime/library").Decimal | null;
+        pressureLoss: import("@prisma/client/runtime/library").Decimal | null;
+        ipRating: import("@prisma/client").$Enums.IPRating | null;
+        communicationModule: import("@prisma/client").$Enums.CommunicationModule;
+    }>;
     delete(id: string): Promise<void>;
 }

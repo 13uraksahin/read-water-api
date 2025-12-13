@@ -952,7 +952,261 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------
-  // 9. Create Global Settings
+  // 9. Link Meter Profiles to Root Tenant (Allowed Profiles)
+  // ---------------------------------------------------------------------------
+  console.log('\n🔗 Linking Meter Profiles to Root Tenant...');
+
+  const allMeterProfileIds = Object.values(createdMeterProfiles).map(p => ({ id: p.id }));
+  await prisma.tenant.update({
+    where: { id: rootTenant.id },
+    data: {
+      allowedProfiles: {
+        connect: allMeterProfileIds,
+      },
+    },
+  });
+  console.log(`   ✓ Linked ${allMeterProfileIds.length} Meter Profiles to ${rootTenant.name}`);
+
+  // ---------------------------------------------------------------------------
+  // 10. Create Sample Customers
+  // ---------------------------------------------------------------------------
+  console.log('\n👥 Creating Sample Customers...');
+
+  const sampleCustomers = [
+    {
+      customerType: 'INDIVIDUAL' as const,
+      consumptionType: 'NORMAL' as const,
+      details: {
+        firstName: 'Ahmet',
+        lastName: 'Yılmaz',
+        tcIdNo: '12345678901',
+        phone: '+905551234567',
+        email: 'ahmet.yilmaz@example.com',
+      },
+      address: {
+        city: 'Istanbul',
+        district: 'Kadıköy',
+        neighborhood: 'Caferağa',
+        street: 'Moda Caddesi',
+        buildingNo: '42',
+        floor: '3',
+        doorNo: '7',
+        postalCode: '34710',
+        extraDetails: 'Near Moda Park',
+      },
+      latitude: 40.9876,
+      longitude: 29.0234,
+    },
+    {
+      customerType: 'INDIVIDUAL' as const,
+      consumptionType: 'HIGH' as const,
+      details: {
+        firstName: 'Fatma',
+        lastName: 'Demir',
+        tcIdNo: '23456789012',
+        phone: '+905552345678',
+        email: 'fatma.demir@example.com',
+      },
+      address: {
+        city: 'Istanbul',
+        district: 'Beşiktaş',
+        neighborhood: 'Levent',
+        street: 'Büyükdere Caddesi',
+        buildingNo: '100',
+        floor: '15',
+        doorNo: '1501',
+        postalCode: '34394',
+        extraDetails: 'Levent Plaza',
+      },
+      latitude: 41.0821,
+      longitude: 29.0115,
+    },
+    {
+      customerType: 'ORGANIZATIONAL' as const,
+      consumptionType: 'HIGH' as const,
+      details: {
+        organizationName: 'ABC Su Sanayi A.Ş.',
+        taxId: '1234567890',
+        taxOffice: 'Kadıköy',
+        contactFirstName: 'Mehmet',
+        contactLastName: 'Öztürk',
+        contactPhone: '+905553456789',
+        contactEmail: 'mehmet.ozturk@abcsu.com',
+      },
+      address: {
+        city: 'Istanbul',
+        district: 'Tuzla',
+        neighborhood: 'Organize Sanayi',
+        street: '2. Cadde',
+        buildingNo: '15',
+        floor: '1',
+        doorNo: '1',
+        postalCode: '34956',
+        extraDetails: 'ABC Su Factory',
+      },
+      latitude: 40.8234,
+      longitude: 29.2987,
+    },
+  ];
+
+  const createdCustomers: Array<{ id: string; name: string }> = [];
+
+  for (const customer of sampleCustomers) {
+    const created = await prisma.customer.upsert({
+      where: {
+        id: '00000000-0000-0000-0000-000000000000', // Will never match, forces create
+      },
+      update: {},
+      create: {
+        tenantId: rootTenant.id,
+        customerType: customer.customerType,
+        consumptionType: customer.consumptionType,
+        details: customer.details,
+        address: customer.address,
+        latitude: customer.latitude,
+        longitude: customer.longitude,
+      },
+    });
+    const customerName = customer.customerType === 'INDIVIDUAL'
+      ? `${(customer.details as any).firstName} ${(customer.details as any).lastName}`
+      : (customer.details as any).organizationName;
+    createdCustomers.push({ id: created.id, name: customerName });
+    console.log(`   ✓ ${customerName} (${customer.customerType})`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 11. Create Sample Meters Linked to Customers
+  // ---------------------------------------------------------------------------
+  console.log('\n📊 Creating Sample Meters Linked to Customers...');
+
+  // Get first customer and first meter profile
+  const firstCustomer = createdCustomers[0];
+  const secondCustomer = createdCustomers[1];
+  const thirdCustomer = createdCustomers[2];
+  const baylanMeterProfileId = createdMeterProfiles['BAYLAN-TK-3S-DN15']?.id;
+  const zennerMeterProfileId = createdMeterProfiles['ZENNER-MTKD-N-DN20']?.id;
+  const manasMeterProfileId = createdMeterProfiles['MANAS-MNS-US-DN25']?.id;
+
+  const sampleMeters = [
+    {
+      customerId: firstCustomer.id,
+      meterProfileId: baylanMeterProfileId!,
+      serialNumber: 'MTR-2024-001',
+      initialIndex: 0,
+      installationDate: new Date('2024-01-15T08:00:00Z'),
+      status: 'ACTIVE' as const,
+      address: {
+        city: 'Istanbul',
+        district: 'Kadıköy',
+        neighborhood: 'Caferağa',
+        street: 'Moda Caddesi',
+        buildingNo: '42',
+        floor: 'B1',
+        doorNo: 'SU-1',
+        postalCode: '34710',
+        extraDetails: 'Meter Room',
+      },
+      latitude: 40.9876,
+      longitude: 29.0234,
+    },
+    {
+      customerId: secondCustomer.id,
+      meterProfileId: zennerMeterProfileId!,
+      serialNumber: 'MTR-2024-002',
+      initialIndex: 1234.567,
+      installationDate: new Date('2024-02-20T10:30:00Z'),
+      status: 'ACTIVE' as const,
+      address: {
+        city: 'Istanbul',
+        district: 'Beşiktaş',
+        neighborhood: 'Levent',
+        street: 'Büyükdere Caddesi',
+        buildingNo: '100',
+        floor: 'B2',
+        doorNo: 'SU-15',
+        postalCode: '34394',
+        extraDetails: 'Building Water Meter',
+      },
+      latitude: 41.0821,
+      longitude: 29.0115,
+    },
+    {
+      customerId: thirdCustomer.id,
+      meterProfileId: manasMeterProfileId!,
+      serialNumber: 'MTR-2024-003',
+      initialIndex: 98765.432,
+      installationDate: new Date('2024-03-10T14:00:00Z'),
+      status: 'ACTIVE' as const,
+      address: {
+        city: 'Istanbul',
+        district: 'Tuzla',
+        neighborhood: 'Organize Sanayi',
+        street: '2. Cadde',
+        buildingNo: '15',
+        floor: '1',
+        doorNo: 'MAIN',
+        postalCode: '34956',
+        extraDetails: 'Factory Main Water Meter',
+      },
+      latitude: 40.8234,
+      longitude: 29.2987,
+    },
+  ];
+
+  const createdMeters: Array<{ id: string; serialNumber: string }> = [];
+
+  for (const meter of sampleMeters) {
+    if (!meter.meterProfileId) {
+      console.log(`   ⚠ Skipping meter - no profile found`);
+      continue;
+    }
+
+    const created = await prisma.meter.upsert({
+      where: { serialNumber: meter.serialNumber },
+      update: {},
+      create: {
+        tenantId: rootTenant.id,
+        customerId: meter.customerId,
+        meterProfileId: meter.meterProfileId,
+        serialNumber: meter.serialNumber,
+        initialIndex: meter.initialIndex,
+        installationDate: meter.installationDate,
+        status: meter.status,
+        address: meter.address,
+        latitude: meter.latitude,
+        longitude: meter.longitude,
+      },
+    });
+    createdMeters.push({ id: created.id, serialNumber: created.serialNumber });
+    const customerName = createdCustomers.find(c => c.id === meter.customerId)?.name || 'Unknown';
+    console.log(`   ✓ ${meter.serialNumber} -> Customer: ${customerName}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 12. Link First Device to First Meter (Demo: Device-Meter Linking)
+  // ---------------------------------------------------------------------------
+  console.log('\n🔗 Linking Demo Device to Meter...');
+
+  // Get the first warehouse device (UNA LoRaWAN) and first meter
+  const firstDevice = await prisma.device.findFirst({
+    where: { serialNumber: 'UNA-LW-001' },
+  });
+  const firstMeter = createdMeters[0];
+
+  if (firstDevice && firstMeter) {
+    await prisma.meter.update({
+      where: { id: firstMeter.id },
+      data: { activeDeviceId: firstDevice.id },
+    });
+    await prisma.device.update({
+      where: { id: firstDevice.id },
+      data: { status: DeviceStatus.ACTIVE },
+    });
+    console.log(`   ✓ Linked ${firstDevice.serialNumber} -> ${firstMeter.serialNumber}`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 13. Create Global Settings
   // ---------------------------------------------------------------------------
   console.log('\n⚙️  Creating Global Settings...');
 
@@ -1021,6 +1275,8 @@ async function main() {
   console.log(`   • Device Profiles: ${deviceProfiles.length}`);
   console.log(`   • Meter Profiles: ${meterProfiles.length}`);
   console.log(`   • Warehouse Devices: ${warehouseDevices.length}`);
+  console.log(`   • Sample Customers: ${createdCustomers.length}`);
+  console.log(`   • Sample Meters: ${createdMeters.length}`);
   console.log(`   • Global Settings: ${globalSettings.length}`);
   console.log('='.repeat(70) + '\n');
 }

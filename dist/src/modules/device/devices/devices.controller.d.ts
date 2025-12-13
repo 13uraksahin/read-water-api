@@ -80,5 +80,19 @@ export declare class DevicesController {
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
     }>;
+    patch(id: string, dto: UpdateDeviceDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        deviceProfileId: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+    }>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
 }

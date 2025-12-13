@@ -25,6 +25,7 @@ export declare class UsersController {
     findAll(query: UserQueryDto, user: AuthenticatedUser): Promise<import("../../../common/interfaces").PaginatedResult<any>>;
     findOne(id: string, user: AuthenticatedUser): Promise<any>;
     update(id: string, dto: UpdateUserDto, user: AuthenticatedUser): Promise<any>;
+    patch(id: string, dto: UpdateUserDto, user: AuthenticatedUser): Promise<any>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
     assignTenant(userId: string, dto: AssignTenantDto, user: AuthenticatedUser): Promise<any>;
     removeTenant(userId: string, tenantId: string, user: AuthenticatedUser): Promise<void>;

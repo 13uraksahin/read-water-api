@@ -13,9 +13,11 @@ import {
   IsArray,
   ValidateNested,
   MinLength,
-  IsNumber,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { SystemRole } from '@prisma/client';
 
 class TenantAssignmentDto {
@@ -128,20 +130,26 @@ export class AssignTenantDto {
 }
 
 export class UserQueryDto {
-  @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(1)
   page?: number;
 
-  @IsNumber()
   @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit?: number;
 
   @IsString()
   @IsOptional()
   search?: string;
 
-  @IsBoolean()
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
   isActive?: boolean;
 
   @IsUUID()

@@ -40,6 +40,9 @@ let CustomersController = class CustomersController {
     async updateCustomer(id, dto) {
         return this.customersService.updateCustomer(id, dto);
     }
+    async patchCustomer(id, dto) {
+        return this.customersService.updateCustomer(id, dto);
+    }
     async deleteCustomer(id) {
         return this.customersService.deleteCustomer(id);
     }
@@ -58,7 +61,7 @@ __decorate([
 ], CustomersController.prototype, "getCustomers", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
@@ -72,16 +75,24 @@ __decorate([
 ], CustomersController.prototype, "createCustomer", null);
 __decorate([
     (0, common_1.Put)(':id'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, customer_dto_1.UpdateCustomerDto]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "updateCustomer", null);
 __decorate([
+    (0, common_1.Patch)(':id'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, customer_dto_1.UpdateCustomerDto]),
+    __metadata("design:returntype", Promise)
+], CustomersController.prototype, "patchCustomer", null);
+__decorate([
     (0, common_1.Delete)(':id'),
     (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
