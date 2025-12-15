@@ -13,24 +13,52 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReadingsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../core/prisma/prisma.service");
+const constants_1 = require("../../common/constants");
 let ReadingsService = ReadingsService_1 = class ReadingsService {
     prisma;
     logger = new common_1.Logger(ReadingsService_1.name);
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getReadings(params) {
+    async getEffectiveTenantPath(user, tenantId) {
+        if (tenantId) {
+            const selectedTenant = await this.prisma.tenant.findUnique({
+                where: { id: tenantId },
+                select: { path: true },
+            });
+            if (!selectedTenant) {
+                return user.tenantPath;
+            }
+            if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+                if (!selectedTenant.path.startsWith(user.tenantPath)) {
+                    return user.tenantPath;
+                }
+            }
+            return selectedTenant.path;
+        }
+        if (user.role === constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            return null;
+        }
+        return user.tenantPath;
+    }
+    async getReadings(params, user) {
         const page = params.page ?? 1;
         const limit = Math.min(params.limit ?? 30, 100);
         const skip = (page - 1) * limit;
         const where = {};
+        const effectivePath = await this.getEffectiveTenantPath(user, params.tenantId);
+        if (effectivePath) {
+            where.tenant = {
+                path: {
+                    startsWith: effectivePath,
+                },
+            };
+        }
         if (params.meterId) {
             where.meterId = params.meterId;
         }
-        if (params.tenantId) {
-            where.meter = {
-                tenantId: params.tenantId,
-            };
+        if (params.sourceDeviceId) {
+            where.sourceDeviceId = params.sourceDeviceId;
         }
         const [total, readings] = await Promise.all([
             this.prisma.reading.count({ where }),
@@ -98,11 +126,11 @@ let ReadingsService = ReadingsService_1 = class ReadingsService {
             },
         };
     }
-    async getMeterReadings(meterId, params) {
+    async getMeterReadings(meterId, params, user) {
         return this.getReadings({
             ...params,
             meterId,
-        });
+        }, user);
     }
 };
 exports.ReadingsService = ReadingsService;

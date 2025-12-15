@@ -16,19 +16,46 @@ const prisma_service_1 = require("../../core/prisma/prisma.service");
 const customer_dto_1 = require("./dto/customer.dto");
 Object.defineProperty(exports, "CreateCustomerDto", { enumerable: true, get: function () { return customer_dto_1.CreateCustomerDto; } });
 Object.defineProperty(exports, "UpdateCustomerDto", { enumerable: true, get: function () { return customer_dto_1.UpdateCustomerDto; } });
+const constants_1 = require("../../common/constants");
 let CustomersService = CustomersService_1 = class CustomersService {
     prisma;
     logger = new common_1.Logger(CustomersService_1.name);
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getCustomers(params) {
+    async getEffectiveTenantPath(user, tenantId) {
+        if (tenantId) {
+            const selectedTenant = await this.prisma.tenant.findUnique({
+                where: { id: tenantId },
+                select: { path: true },
+            });
+            if (!selectedTenant) {
+                return user.tenantPath;
+            }
+            if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+                if (!selectedTenant.path.startsWith(user.tenantPath)) {
+                    return user.tenantPath;
+                }
+            }
+            return selectedTenant.path;
+        }
+        if (user.role === constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            return null;
+        }
+        return user.tenantPath;
+    }
+    async getCustomers(params, user) {
         const page = params.page ?? 1;
         const limit = Math.min(params.limit ?? 30, 100);
         const skip = (page - 1) * limit;
         const where = {};
-        if (params.tenantId) {
-            where.tenantId = params.tenantId;
+        const effectivePath = await this.getEffectiveTenantPath(user, params.tenantId);
+        if (effectivePath) {
+            where.tenant = {
+                path: {
+                    startsWith: effectivePath,
+                },
+            };
         }
         if (params.customerType) {
             where.customerType = params.customerType;
@@ -63,6 +90,13 @@ let CustomersService = CustomersService_1 = class CustomersService {
                 skip,
                 take: limit,
                 include: {
+                    tenant: {
+                        select: {
+                            id: true,
+                            name: true,
+                            path: true,
+                        },
+                    },
                     meters: {
                         select: {
                             id: true,
@@ -84,10 +118,17 @@ let CustomersService = CustomersService_1 = class CustomersService {
             },
         };
     }
-    async getCustomer(id) {
+    async getCustomer(id, user) {
         const customer = await this.prisma.customer.findUnique({
             where: { id },
             include: {
+                tenant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                    },
+                },
                 meters: {
                     select: {
                         id: true,
@@ -100,9 +141,25 @@ let CustomersService = CustomersService_1 = class CustomersService {
         if (!customer) {
             throw new common_1.NotFoundException(`Customer with ID ${id} not found`);
         }
+        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            if (!customer.tenant.path.startsWith(user.tenantPath)) {
+                throw new common_1.ForbiddenException('You do not have access to this customer');
+            }
+        }
         return this.mapCustomer(customer);
     }
-    async createCustomer(dto) {
+    async createCustomer(dto, user) {
+        const tenant = await this.prisma.tenant.findUnique({
+            where: { id: dto.tenantId },
+        });
+        if (!tenant) {
+            throw new common_1.NotFoundException('Tenant not found');
+        }
+        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            if (!tenant.path.startsWith(user.tenantPath)) {
+                throw new common_1.ForbiddenException('You do not have access to create customers in this tenant');
+            }
+        }
         const customer = await this.prisma.customer.create({
             data: {
                 tenantId: dto.tenantId,
@@ -116,6 +173,13 @@ let CustomersService = CustomersService_1 = class CustomersService {
                 metadata: dto.metadata,
             },
             include: {
+                tenant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                    },
+                },
                 meters: {
                     select: {
                         id: true,
@@ -125,12 +189,25 @@ let CustomersService = CustomersService_1 = class CustomersService {
                 },
             },
         });
+        this.logger.log(`Created customer in tenant ${tenant.name}`);
         return this.mapCustomer(customer);
     }
-    async updateCustomer(id, dto) {
-        const existing = await this.prisma.customer.findUnique({ where: { id } });
+    async updateCustomer(id, dto, user) {
+        const existing = await this.prisma.customer.findUnique({
+            where: { id },
+            include: {
+                tenant: {
+                    select: { id: true, name: true, path: true },
+                },
+            },
+        });
         if (!existing) {
             throw new common_1.NotFoundException(`Customer with ID ${id} not found`);
+        }
+        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            if (!existing.tenant.path.startsWith(user.tenantPath)) {
+                throw new common_1.ForbiddenException('You do not have access to update this customer');
+            }
         }
         const customer = await this.prisma.customer.update({
             where: { id },
@@ -145,6 +222,13 @@ let CustomersService = CustomersService_1 = class CustomersService {
                 ...(dto.metadata !== undefined && { metadata: dto.metadata }),
             },
             include: {
+                tenant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        path: true,
+                    },
+                },
                 meters: {
                     select: {
                         id: true,
@@ -156,12 +240,25 @@ let CustomersService = CustomersService_1 = class CustomersService {
         });
         return this.mapCustomer(customer);
     }
-    async deleteCustomer(id) {
-        const existing = await this.prisma.customer.findUnique({ where: { id } });
+    async deleteCustomer(id, user) {
+        const existing = await this.prisma.customer.findUnique({
+            where: { id },
+            include: {
+                tenant: {
+                    select: { id: true, name: true, path: true },
+                },
+            },
+        });
         if (!existing) {
             throw new common_1.NotFoundException(`Customer with ID ${id} not found`);
         }
+        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            if (!existing.tenant.path.startsWith(user.tenantPath)) {
+                throw new common_1.ForbiddenException('You do not have access to delete this customer');
+            }
+        }
         await this.prisma.customer.delete({ where: { id } });
+        this.logger.log(`Deleted customer ${id} from tenant ${existing.tenant.name}`);
     }
     mapCustomer(customer) {
         return {
@@ -177,6 +274,7 @@ let CustomersService = CustomersService_1 = class CustomersService {
             latitude: customer.latitude ? Number(customer.latitude) : null,
             longitude: customer.longitude ? Number(customer.longitude) : null,
             metadata: customer.metadata,
+            tenant: customer.tenant,
             meters: customer.meters,
         };
     }

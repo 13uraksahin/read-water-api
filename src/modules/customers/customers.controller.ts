@@ -21,6 +21,8 @@ import { CustomersService } from './customers.service';
 import type { PaginatedCustomers, CustomerData } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 import { JwtAuthGuard } from '../iam/auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators';
+import type { AuthenticatedUser } from '../../common/interfaces';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard)
@@ -29,6 +31,7 @@ export class CustomersController {
 
   @Get()
   async getCustomers(
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('tenantId') tenantId?: string,
@@ -41,38 +44,49 @@ export class CustomersController {
       tenantId,
       customerType,
       search,
-    });
+    }, user);
   }
 
   @Get(':id')
-  async getCustomer(@Param('id', ParseUUIDPipe) id: string): Promise<CustomerData> {
-    return this.customersService.getCustomer(id);
+  async getCustomer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<CustomerData> {
+    return this.customersService.getCustomer(id, user);
   }
 
   @Post()
-  async createCustomer(@Body() dto: CreateCustomerDto): Promise<CustomerData> {
-    return this.customersService.createCustomer(dto);
+  async createCustomer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateCustomerDto,
+  ): Promise<CustomerData> {
+    return this.customersService.createCustomer(dto, user);
   }
 
   @Put(':id')
   async updateCustomer(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCustomerDto,
   ): Promise<CustomerData> {
-    return this.customersService.updateCustomer(id, dto);
+    return this.customersService.updateCustomer(id, dto, user);
   }
 
   @Patch(':id')
   async patchCustomer(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCustomerDto,
   ): Promise<CustomerData> {
-    return this.customersService.updateCustomer(id, dto);
+    return this.customersService.updateCustomer(id, dto, user);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteCustomer(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.customersService.deleteCustomer(id);
+  async deleteCustomer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.customersService.deleteCustomer(id, user);
   }
 }

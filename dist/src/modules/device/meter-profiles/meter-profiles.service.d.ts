@@ -13,6 +13,19 @@ export declare class MeterProfilesService {
     findOne(id: string): Promise<MeterProfile>;
     update(id: string, dto: UpdateMeterProfileDto): Promise<MeterProfile>;
     delete(id: string): Promise<void>;
-    getCommunicationTechFields(): Promise<any>;
-    getDeviceProfiles(): Promise<any>;
+    getCommunicationTechFields(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        technology: import("@prisma/client").$Enums.CommunicationTechnology;
+        fields: import("@prisma/client/runtime/library").JsonValue;
+        integrationTypes: import("@prisma/client").$Enums.IntegrationType[];
+    }[]>;
+    getDeviceProfiles(): Promise<{
+        id: string;
+        brand: import("@prisma/client").$Enums.DeviceBrand;
+        modelCode: string;
+        communicationTechnology: import("@prisma/client").$Enums.CommunicationTechnology;
+        batteryLifeMonths: number | null;
+    }[]>;
 }

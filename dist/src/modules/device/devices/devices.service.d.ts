@@ -11,10 +11,11 @@ export declare class DevicesService {
         created: number;
         errors: string[];
     }>;
+    private getEffectiveTenantPath;
     findAll(query: DeviceQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Device>>;
     findAvailable(tenantId: string, meterProfileId: string, user: AuthenticatedUser): Promise<Device[]>;
     findOne(id: string, user: AuthenticatedUser): Promise<Device & {
-        linkedMeter?: any;
+        meter?: any;
     }>;
     findByDynamicField(fieldName: string, fieldValue: string): Promise<Device | null>;
     update(id: string, dto: UpdateDeviceDto, user: AuthenticatedUser): Promise<Device>;

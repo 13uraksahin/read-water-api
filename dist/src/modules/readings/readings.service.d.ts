@@ -1,4 +1,5 @@
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { AuthenticatedUser } from '../../common/interfaces';
 export interface ReadingWithMeter {
     id: string;
     time: Date;
@@ -39,14 +40,16 @@ export interface ReadingsQueryParams {
     limit?: number;
     meterId?: string;
     tenantId?: string;
+    sourceDeviceId?: string;
 }
 export declare class ReadingsService {
     private readonly prisma;
     private readonly logger;
     constructor(prisma: PrismaService);
-    getReadings(params: ReadingsQueryParams): Promise<PaginatedReadings>;
+    private getEffectiveTenantPath;
+    getReadings(params: ReadingsQueryParams, user: AuthenticatedUser): Promise<PaginatedReadings>;
     getMeterReadings(meterId: string, params: {
         page?: number;
         limit?: number;
-    }): Promise<PaginatedReadings>;
+    }, user: AuthenticatedUser): Promise<PaginatedReadings>;
 }

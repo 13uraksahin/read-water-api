@@ -126,6 +126,39 @@ export class MetersService {
   }
 
   /**
+   * Get the effective tenant path for filtering
+   */
+  private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
+    // If specific tenant selected, look up its path
+    if (tenantId) {
+      const selectedTenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { path: true },
+      });
+
+      if (!selectedTenant) {
+        return user.tenantPath;
+      }
+
+      // For non-admin users, verify they have access to the selected tenant
+      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
+        if (!selectedTenant.path.startsWith(user.tenantPath)) {
+          return user.tenantPath;
+        }
+      }
+
+      return selectedTenant.path;
+    }
+
+    // No tenant selected - Platform admin sees all, others see their hierarchy
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      return null;
+    }
+
+    return user.tenantPath;
+  }
+
+  /**
    * Get all meters with pagination and filtering
    */
   async findAll(
@@ -138,17 +171,15 @@ export class MetersService {
 
     const whereClause: any = {};
 
-    // Filter by accessible tenants
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
+    // Get effective tenant path for filtering
+    const effectivePath = await this.getEffectiveTenantPath(user, query.tenantId);
+    
+    if (effectivePath) {
       whereClause.tenant = {
         path: {
-          startsWith: user.tenantPath,
+          startsWith: effectivePath,
         },
       };
-    }
-
-    if (query.tenantId) {
-      whereClause.tenantId = query.tenantId;
     }
 
     if (query.customerId) {

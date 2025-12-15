@@ -1,5 +1,6 @@
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
+import { AuthenticatedUser } from '../../common/interfaces';
 export interface CustomerData {
     id: string;
     createdAt: Date;
@@ -13,6 +14,11 @@ export interface CustomerData {
     latitude: number | null;
     longitude: number | null;
     metadata: Record<string, unknown> | null;
+    tenant?: {
+        id: string;
+        name: string;
+        path: string;
+    };
     meters?: Array<{
         id: string;
         serialNumber: string;
@@ -40,10 +46,11 @@ export declare class CustomersService {
     private readonly prisma;
     private readonly logger;
     constructor(prisma: PrismaService);
-    getCustomers(params: CustomersQueryParams): Promise<PaginatedCustomers>;
-    getCustomer(id: string): Promise<CustomerData>;
-    createCustomer(dto: CreateCustomerDto): Promise<CustomerData>;
-    updateCustomer(id: string, dto: UpdateCustomerDto): Promise<CustomerData>;
-    deleteCustomer(id: string): Promise<void>;
+    private getEffectiveTenantPath;
+    getCustomers(params: CustomersQueryParams, user: AuthenticatedUser): Promise<PaginatedCustomers>;
+    getCustomer(id: string, user: AuthenticatedUser): Promise<CustomerData>;
+    createCustomer(dto: CreateCustomerDto, user: AuthenticatedUser): Promise<CustomerData>;
+    updateCustomer(id: string, dto: UpdateCustomerDto, user: AuthenticatedUser): Promise<CustomerData>;
+    deleteCustomer(id: string, user: AuthenticatedUser): Promise<void>;
     private mapCustomer;
 }

@@ -4,6 +4,8 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { AuthenticatedUser } from '../../common/interfaces';
+import { SYSTEM_ROLES } from '../../common/constants';
 
 export interface ReadingWithMeter {
   id: string;
@@ -47,6 +49,7 @@ export interface ReadingsQueryParams {
   limit?: number;
   meterId?: string;
   tenantId?: string;
+  sourceDeviceId?: string;
 }
 
 @Injectable()
@@ -56,24 +59,63 @@ export class ReadingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Get paginated readings
+   * Get the effective tenant path for filtering
    */
-  async getReadings(params: ReadingsQueryParams): Promise<PaginatedReadings> {
+  private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
+    if (tenantId) {
+      const selectedTenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { path: true },
+      });
+
+      if (!selectedTenant) {
+        return user.tenantPath;
+      }
+
+      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
+        if (!selectedTenant.path.startsWith(user.tenantPath)) {
+          return user.tenantPath;
+        }
+      }
+
+      return selectedTenant.path;
+    }
+
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      return null;
+    }
+
+    return user.tenantPath;
+  }
+
+  /**
+   * Get paginated readings with tenant filtering
+   */
+  async getReadings(params: ReadingsQueryParams, user: AuthenticatedUser): Promise<PaginatedReadings> {
     const page = params.page ?? 1;
     const limit = Math.min(params.limit ?? 30, 100); // Max 100 per page
     const skip = (page - 1) * limit;
 
     // Build where clause
     const where: Record<string, unknown> = {};
+
+    // Get effective tenant path for filtering
+    const effectivePath = await this.getEffectiveTenantPath(user, params.tenantId);
+    
+    if (effectivePath) {
+      where.tenant = {
+        path: {
+          startsWith: effectivePath,
+        },
+      };
+    }
     
     if (params.meterId) {
       where.meterId = params.meterId;
     }
     
-    if (params.tenantId) {
-      where.meter = {
-        tenantId: params.tenantId,
-      };
+    if (params.sourceDeviceId) {
+      where.sourceDeviceId = params.sourceDeviceId;
     }
 
     // Run count and find in parallel
@@ -152,10 +194,11 @@ export class ReadingsService {
   async getMeterReadings(
     meterId: string,
     params: { page?: number; limit?: number },
+    user: AuthenticatedUser,
   ): Promise<PaginatedReadings> {
     return this.getReadings({
       ...params,
       meterId,
-    });
+    }, user);
   }
 }

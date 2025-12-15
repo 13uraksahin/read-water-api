@@ -169,6 +169,36 @@ export class DevicesService {
   }
 
   /**
+   * Get the effective tenant path for filtering
+   */
+  private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
+    if (tenantId) {
+      const selectedTenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { path: true },
+      });
+
+      if (!selectedTenant) {
+        return user.tenantPath;
+      }
+
+      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
+        if (!selectedTenant.path.startsWith(user.tenantPath)) {
+          return user.tenantPath;
+        }
+      }
+
+      return selectedTenant.path;
+    }
+
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      return null;
+    }
+
+    return user.tenantPath;
+  }
+
+  /**
    * Get all devices with pagination and filtering
    */
   async findAll(
@@ -184,17 +214,15 @@ export class DevicesService {
 
     const whereClause: any = {};
 
-    // Filter by accessible tenants
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
+    // Get effective tenant path for filtering
+    const effectivePath = await this.getEffectiveTenantPath(user, query.tenantId);
+    
+    if (effectivePath) {
       whereClause.tenant = {
         path: {
-          startsWith: user.tenantPath,
+          startsWith: effectivePath,
         },
       };
-    }
-
-    if (query.tenantId) {
-      whereClause.tenantId = query.tenantId;
     }
 
     if (query.deviceProfileId) {
@@ -324,7 +352,7 @@ export class DevicesService {
   /**
    * Get device by ID
    */
-  async findOne(id: string, user: AuthenticatedUser): Promise<Device & { linkedMeter?: any }> {
+  async findOne(id: string, user: AuthenticatedUser): Promise<Device & { meter?: any }> {
     const device = await this.prisma.device.findUnique({
       where: { id },
       include: {
@@ -332,6 +360,20 @@ export class DevicesService {
           select: { id: true, name: true, path: true },
         },
         deviceProfile: true,
+        // Include the linked meter via Prisma's relation (inverse of Meter.activeDevice)
+        meter: {
+          select: {
+            id: true,
+            serialNumber: true,
+            status: true,
+            customer: {
+              select: { id: true, details: true },
+            },
+            meterProfile: {
+              select: { brand: true, modelCode: true },
+            },
+          },
+        },
       },
     });
 
@@ -346,20 +388,7 @@ export class DevicesService {
       }
     }
 
-    // Find linked meter (if any)
-    const linkedMeter = await this.prisma.meter.findFirst({
-      where: { activeDeviceId: id },
-      include: {
-        customer: {
-          select: { id: true, details: true },
-        },
-        meterProfile: {
-          select: { brand: true, modelCode: true },
-        },
-      },
-    });
-
-    return { ...device, linkedMeter };
+    return device;
   }
 
   /**
@@ -399,7 +428,7 @@ export class DevicesService {
     }
 
     // Prevent status change if device is linked to a meter
-    if (dto.status && device.linkedMeter) {
+    if (dto.status && device.meter) {
       if (dto.status === DeviceStatus.WAREHOUSE) {
         throw new BadRequestException(
           'Cannot set status to WAREHOUSE while device is linked to a meter. Unlink first.',
@@ -447,7 +476,7 @@ export class DevicesService {
     const device = await this.findOne(id, user);
 
     // Prevent deletion if device is linked to a meter
-    if (device.linkedMeter) {
+    if (device.meter) {
       throw new BadRequestException(
         'Cannot delete device while it is linked to a meter. Unlink first.',
       );

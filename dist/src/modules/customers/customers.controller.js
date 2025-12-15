@@ -17,84 +17,91 @@ const common_1 = require("@nestjs/common");
 const customers_service_1 = require("./customers.service");
 const customer_dto_1 = require("./dto/customer.dto");
 const jwt_auth_guard_1 = require("../iam/auth/guards/jwt-auth.guard");
+const decorators_1 = require("../../common/decorators");
 let CustomersController = class CustomersController {
     customersService;
     constructor(customersService) {
         this.customersService = customersService;
     }
-    async getCustomers(page, limit, tenantId, customerType, search) {
+    async getCustomers(user, page, limit, tenantId, customerType, search) {
         return this.customersService.getCustomers({
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             tenantId,
             customerType,
             search,
-        });
+        }, user);
     }
-    async getCustomer(id) {
-        return this.customersService.getCustomer(id);
+    async getCustomer(user, id) {
+        return this.customersService.getCustomer(id, user);
     }
-    async createCustomer(dto) {
-        return this.customersService.createCustomer(dto);
+    async createCustomer(user, dto) {
+        return this.customersService.createCustomer(dto, user);
     }
-    async updateCustomer(id, dto) {
-        return this.customersService.updateCustomer(id, dto);
+    async updateCustomer(user, id, dto) {
+        return this.customersService.updateCustomer(id, dto, user);
     }
-    async patchCustomer(id, dto) {
-        return this.customersService.updateCustomer(id, dto);
+    async patchCustomer(user, id, dto) {
+        return this.customersService.updateCustomer(id, dto, user);
     }
-    async deleteCustomer(id) {
-        return this.customersService.deleteCustomer(id);
+    async deleteCustomer(user, id) {
+        return this.customersService.deleteCustomer(id, user);
     }
 };
 exports.CustomersController = CustomersController;
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Query)('page')),
-    __param(1, (0, common_1.Query)('limit')),
-    __param(2, (0, common_1.Query)('tenantId')),
-    __param(3, (0, common_1.Query)('customerType')),
-    __param(4, (0, common_1.Query)('search')),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
+    __param(3, (0, common_1.Query)('tenantId')),
+    __param(4, (0, common_1.Query)('customerType')),
+    __param(5, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String, String]),
+    __metadata("design:paramtypes", [Object, String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "getCustomers", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "getCustomer", null);
 __decorate([
     (0, common_1.Post)(),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [customer_dto_1.CreateCustomerDto]),
+    __metadata("design:paramtypes", [Object, customer_dto_1.CreateCustomerDto]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "createCustomer", null);
 __decorate([
     (0, common_1.Put)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, customer_dto_1.UpdateCustomerDto]),
+    __metadata("design:paramtypes", [Object, String, customer_dto_1.UpdateCustomerDto]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "updateCustomer", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, customer_dto_1.UpdateCustomerDto]),
+    __metadata("design:paramtypes", [Object, String, customer_dto_1.UpdateCustomerDto]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "patchCustomer", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
-    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "deleteCustomer", null);
 exports.CustomersController = CustomersController = __decorate([

@@ -1,13 +1,9 @@
 // =============================================================================
-// Read Water - Database Seed Script
+// Read Water - Seed 2 Script (Development/Demo Environment)
 // =============================================================================
-// Seeds the database with:
-// 1. Communication Technology Field Definitions (from Functional Specifications 6.8)
-// 2. Root Tenant
-// 3. Platform Admin User
-// 4. Device Profiles with Decoder Functions
-// 5. Sample Warehouse Devices
-// 6. Sample Meter Profiles with Compatible Device Profiles
+// SEED 2: Lighter dataset for development and demos
+// - 100 meters per batch (1,700 total)
+// - 45 days of readings (24 readings/day)
 // =============================================================================
 
 import 'dotenv/config';
@@ -27,510 +23,137 @@ import {
   TemperatureType,
   CommunicationModule,
   IPRating,
+  MeterStatus,
+  CustomerType,
+  ConsumptionType,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 // Initialize Prisma Client
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ['warn', 'error'],
+});
 
 // =============================================================================
-// COMMUNICATION TECHNOLOGY FIELD DEFINITIONS
-// From Section 6.8 of Functional Specifications
+// CONSTANTS & CONFIGURATION
 // =============================================================================
-const communicationTechFieldDefs = [
-  {
-    technology: CommunicationTechnology.SIGFOX,
-    integrationTypes: [IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'ID',
-        label: 'Sigfox ID',
-        type: 'hex',
-        length: 8,
-        regex: '^[a-fA-F0-9]{8}$',
-        required: true,
-        description: 'Sigfox device ID (8 hex characters)',
-      },
-      {
-        name: 'PAC',
-        label: 'PAC',
-        type: 'hex',
-        length: 16,
-        regex: '^[a-fA-F0-9]{16}$',
-        required: true,
-        description: 'Porting Authorization Code (16 hex characters)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.LORAWAN,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'DevEUI',
-        label: 'Device EUI',
-        type: 'hex',
-        length: 16,
-        regex: '^[a-fA-F0-9]{16}$',
-        required: true,
-        description: 'Device Extended Unique Identifier (16 hex characters)',
-      },
-      {
-        name: 'JoinEUI',
-        label: 'Join EUI',
-        type: 'hex',
-        length: 16,
-        regex: '^[a-fA-F0-9]{16}$',
-        required: true,
-        description: 'Join Server EUI (16 hex characters)',
-      },
-      {
-        name: 'AppKey',
-        label: 'Application Key',
-        type: 'hex',
-        length: 32,
-        regex: '^[a-fA-F0-9]{32}$',
-        required: true,
-        description: 'Application Key for OTAA (32 hex characters)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.NB_IOT,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'IMEI',
-        label: 'IMEI',
-        type: 'string',
-        length: 15,
-        regex: '^[0-9]{15}$',
-        required: true,
-        description: 'International Mobile Equipment Identity (15 digits)',
-      },
-      {
-        name: 'IMSI',
-        label: 'IMSI',
-        type: 'string',
-        length: 15,
-        regex: '^[0-9]{15}$',
-        required: false,
-        description: 'International Mobile Subscriber Identity (15 digits)',
-      },
-      {
-        name: 'ICCID',
-        label: 'SIM ICCID',
-        type: 'string',
-        length: 20,
-        regex: '^[0-9]{18,20}$',
-        required: false,
-        description: 'Integrated Circuit Card Identifier (18-20 digits)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.WM_BUS,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'ManufacturerId',
-        label: 'Manufacturer ID',
-        type: 'string',
-        length: 3,
-        regex: '^[A-Z]{3}$',
-        required: true,
-        description: 'Manufacturer ID (3 uppercase letters)',
-      },
-      {
-        name: 'DeviceId',
-        label: 'Device ID',
-        type: 'hex',
-        length: 8,
-        regex: '^[a-fA-F0-9]{8}$',
-        required: true,
-        description: 'wM-Bus device ID (8 hex characters)',
-      },
-      {
-        name: 'EncryptionKey',
-        label: 'Encryption Key',
-        type: 'hex',
-        length: 32,
-        regex: '^[a-fA-F0-9]{32}$',
-        required: false,
-        description: 'AES-128 encryption key (32 hex characters)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.MIOTY,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'ShortAddress',
-        label: 'Short Address',
-        type: 'hex',
-        length: 8,
-        regex: '^[a-fA-F0-9]{8}$',
-        required: true,
-        description: 'Mioty short address (8 hex characters)',
-      },
-      {
-        name: 'EUI64',
-        label: 'EUI-64',
-        type: 'hex',
-        length: 16,
-        regex: '^[a-fA-F0-9]{16}$',
-        required: true,
-        description: 'Extended unique identifier (16 hex characters)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.WIFI,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'MacAddress',
-        label: 'MAC Address',
-        type: 'string',
-        length: 17,
-        regex: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$',
-        required: true,
-        description: 'WiFi MAC address (format: XX:XX:XX:XX:XX:XX)',
-      },
-      {
-        name: 'SSID',
-        label: 'SSID',
-        type: 'string',
-        length: 32,
-        regex: '^.{1,32}$',
-        required: false,
-        description: 'Network SSID (up to 32 characters)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.BLUETOOTH,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'MacAddress',
-        label: 'BLE MAC Address',
-        type: 'string',
-        length: 17,
-        regex: '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$',
-        required: true,
-        description: 'Bluetooth MAC address (format: XX:XX:XX:XX:XX:XX)',
-      },
-      {
-        name: 'ServiceUUID',
-        label: 'Service UUID',
-        type: 'string',
-        length: 36,
-        regex: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-        required: false,
-        description: 'BLE service UUID',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.NFC,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'UID',
-        label: 'NFC UID',
-        type: 'hex',
-        length: 14,
-        regex: '^[a-fA-F0-9]{4,14}$',
-        required: true,
-        description: 'NFC unique identifier (4-14 hex characters)',
-      },
-    ],
-  },
-  {
-    technology: CommunicationTechnology.OMS,
-    integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
-    fields: [
-      {
-        name: 'ManufacturerId',
-        label: 'Manufacturer ID',
-        type: 'string',
-        length: 3,
-        regex: '^[A-Z]{3}$',
-        required: true,
-        description: 'Manufacturer ID (3 uppercase letters)',
-      },
-      {
-        name: 'DeviceId',
-        label: 'Device ID',
-        type: 'hex',
-        length: 8,
-        regex: '^[a-fA-F0-9]{8}$',
-        required: true,
-        description: 'OMS device ID (8 hex characters)',
-      },
-      {
-        name: 'EncryptionKey',
-        label: 'Encryption Key',
-        type: 'hex',
-        length: 32,
-        regex: '^[a-fA-F0-9]{32}$',
-        required: false,
-        description: 'AES-128 encryption key (32 hex characters)',
-      },
-    ],
-  },
-];
+const BATCH_SIZE = 100;
+const PASSWORD = 'Asdf1234.';
+const SALT_ROUNDS = 10;
+
+// Hatay coordinates (for HATSU)
+const HATSU_BASE_LAT = 36.2025;
+const HATSU_BASE_LNG = 36.1601;
+
+// Ankara coordinates (for ASKİ)
+const ASKI_BASE_LAT = 39.9334;
+const ASKI_BASE_LNG = 32.8597;
 
 // =============================================================================
-// DEVICE PROFILES - From Section 12 of Functional Specifications
-// Decoder functions are now stored here instead of in MeterProfile
+// HELPER FUNCTIONS
 // =============================================================================
-const deviceProfiles = [
-  {
-    brand: DeviceBrand.UNA,
-    modelCode: 'UNA-LORA-01',
-    communicationTechnology: CommunicationTechnology.LORAWAN,
-    integrationType: IntegrationType.MQTT,
-    fieldDefinitions: [
-      { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
-      { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
-      { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
-    ],
-    decoderFunction: `
-// UNA LoRaWAN Water Meter Decoder
-// Expects payload: [4 bytes value] [1 byte battery] [1 byte signal]
-function decode(payload) {
-  const bytes = Buffer.from(payload, 'hex');
-  
-  // Parse meter value (4 bytes, big-endian, divided by 1000 for m³)
-  const value = bytes.readUInt32BE(0) / 1000;
-  
-  // Parse battery level (1 byte, percentage)
-  const batteryLevel = bytes.length > 4 ? bytes.readUInt8(4) : null;
-  
-  // Parse signal strength (1 byte, signed, dBm)
-  const signalStrength = bytes.length > 5 ? bytes.readInt8(5) : null;
-  
-  return {
-    value,
-    batteryLevel,
-    signalStrength,
-    unit: 'm3'
-  };
-}`.trim(),
-    testPayload: '00015F90640A',
-    expectedOutput: { value: 89.488, batteryLevel: 100, signalStrength: 10, unit: 'm3' },
-    batteryLifeMonths: 120,
-    specifications: { manufacturer: 'Una Technologies', firmware: '1.2.0' },
-  },
-  {
-    brand: DeviceBrand.IMA,
-    modelCode: 'IMA-SIGFOX-01',
-    communicationTechnology: CommunicationTechnology.SIGFOX,
-    integrationType: IntegrationType.HTTP,
-    fieldDefinitions: [
-      { name: 'ID', type: 'hex', length: 8, regex: '^[a-fA-F0-9]{8}$', required: true },
-      { name: 'PAC', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
-    ],
-    decoderFunction: `
-// IMA Sigfox Water Meter Decoder
-// Expects 12-byte payload
-function decode(payload) {
-  const bytes = Buffer.from(payload, 'hex');
-  
-  // Parse meter value (4 bytes, little-endian, in liters, convert to m³)
-  const valueLiters = bytes.readUInt32LE(0);
-  const value = valueLiters / 1000;
-  
-  // Parse battery voltage (2 bytes, mV)
-  const batteryMv = bytes.readUInt16LE(4);
-  const batteryLevel = Math.min(100, Math.round((batteryMv - 2200) / 14));
-  
-  return {
-    value,
-    batteryLevel,
-    signalStrength: null,
-    unit: 'm3'
-  };
-}`.trim(),
-    testPayload: '905F010000A40D',
-    expectedOutput: { value: 89.488, batteryLevel: 100, signalStrength: null, unit: 'm3' },
-    batteryLifeMonths: 60,
-    specifications: { manufacturer: 'IMA Metering', firmware: '2.1.0' },
-  },
-  {
-    brand: DeviceBrand.ITRON,
-    modelCode: 'ITRON-NBIOT-01',
-    communicationTechnology: CommunicationTechnology.NB_IOT,
-    integrationType: IntegrationType.HTTP,
-    fieldDefinitions: [
-      { name: 'IMEI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: true },
-      { name: 'IMSI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: false },
-      { name: 'ICCID', type: 'string', length: 20, regex: '^[0-9]{18,20}$', required: false },
-    ],
-    decoderFunction: `
-// ITRON NB-IoT Water Meter Decoder (JSON payload)
-function decode(payload) {
-  // ITRON sends JSON payloads
-  const data = JSON.parse(payload);
-  
-  return {
-    value: data.meterReading / 1000,
-    batteryLevel: data.batteryPercent,
-    signalStrength: data.rssi,
-    unit: 'm3'
-  };
-}`.trim(),
-    testPayload: '{"meterReading":89488,"batteryPercent":95,"rssi":-85}',
-    expectedOutput: { value: 89.488, batteryLevel: 95, signalStrength: -85, unit: 'm3' },
-    batteryLifeMonths: 84,
-    specifications: { manufacturer: 'Itron Inc.', firmware: '3.0.1' },
-  },
-  {
-    brand: DeviceBrand.ZENNER,
-    modelCode: 'ZENNER-WMBUS-01',
-    communicationTechnology: CommunicationTechnology.WM_BUS,
-    integrationType: IntegrationType.MQTT,
-    fieldDefinitions: [
-      { name: 'ManufacturerId', type: 'string', length: 3, regex: '^[A-Z]{3}$', required: true },
-      { name: 'DeviceId', type: 'hex', length: 8, regex: '^[a-fA-F0-9]{8}$', required: true },
-      { name: 'EncryptionKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: false },
-    ],
-    decoderFunction: `
-// ZENNER wM-Bus Water Meter Decoder
-function decode(payload) {
-  const bytes = Buffer.from(payload, 'hex');
-  
-  // wM-Bus standard format
-  // Skip header (first 12 bytes), value at offset 12
-  const value = bytes.readUInt32LE(12) / 1000;
-  const batteryLevel = bytes.length > 16 ? bytes.readUInt8(16) : null;
-  
-  return {
-    value,
-    batteryLevel,
-    signalStrength: null,
-    unit: 'm3'
-  };
-}`.trim(),
-    testPayload: '0000000000000000000000009050010064',
-    expectedOutput: { value: 89.488, batteryLevel: 100, signalStrength: null, unit: 'm3' },
-    batteryLifeMonths: 96,
-    specifications: { manufacturer: 'Zenner International', firmware: '1.5.2' },
-  },
-];
+
+/**
+ * Generate random coordinates within a radius
+ */
+function randomCoordinate(baseLat: number, baseLng: number, radiusKm = 10): { lat: number; lng: number } {
+  const radiusDeg = radiusKm / 111; // ~111km per degree
+  const lat = baseLat + (Math.random() - 0.5) * 2 * radiusDeg;
+  const lng = baseLng + (Math.random() - 0.5) * 2 * radiusDeg;
+  return { lat: parseFloat(lat.toFixed(8)), lng: parseFloat(lng.toFixed(8)) };
+}
+
+/**
+ * Generate a random hex string of given length
+ */
+function randomHex(length: number): string {
+  const chars = '0123456789ABCDEF';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
+
+/**
+ * Generate a unique serial number
+ */
+function generateSerial(prefix: string, index: number): string {
+  return `${prefix}-${String(index).padStart(6, '0')}`;
+}
+
+/**
+ * Process items in batches with transaction
+ */
+async function processBatch<T>(
+  items: T[],
+  batchSize: number,
+  processor: (batch: T[]) => Promise<void>,
+  label: string
+): Promise<void> {
+  const totalBatches = Math.ceil(items.length / batchSize);
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchNum = Math.floor(i / batchSize) + 1;
+    process.stdout.write(`\r   Processing ${label}: Batch ${batchNum}/${totalBatches} (${Math.min(i + batchSize, items.length)}/${items.length})`);
+    await processor(batch);
+  }
+  console.log(` ✓`);
+}
 
 // =============================================================================
-// METER PROFILES - From Section 5.1 of Functional Specifications
+// PART A: TEARDOWN (Clean Old Data)
 // =============================================================================
-const meterProfiles = [
-  {
-    brand: Brand.BAYLAN,
-    modelCode: 'TK-3S-DN15',
-    meterType: MeterType.MULTI_JET,
-    dialType: DialType.DRY,
-    connectionType: ConnectionType.THREAD,
-    mountingType: MountingType.HORIZONTAL,
-    temperatureType: TemperatureType.T30,
-    diameter: 15,
-    length: 165,
-    width: 75,
-    height: 95,
-    q1: 0.01,
-    q2: 0.016,
-    q3: 2.5,
-    q4: 3.125,
-    rValue: 250,
-    pressureLoss: 0.063,
-    ipRating: IPRating.IP68,
-    communicationModule: CommunicationModule.RETROFIT,
-    specifications: { material: 'Brass', maxPressure: '16 bar' },
-  },
-  {
-    brand: Brand.ZENNER,
-    modelCode: 'MTKD-N-DN20',
-    meterType: MeterType.MULTI_JET,
-    dialType: DialType.SUPER_DRY,
-    connectionType: ConnectionType.THREAD,
-    mountingType: MountingType.BOTH,
-    temperatureType: TemperatureType.T30,
-    diameter: 20,
-    length: 190,
-    width: 80,
-    height: 100,
-    q1: 0.016,
-    q2: 0.025,
-    q3: 4.0,
-    q4: 5.0,
-    rValue: 250,
-    pressureLoss: 0.063,
-    ipRating: IPRating.IP68,
-    communicationModule: CommunicationModule.INTEGRATED,
-    specifications: { material: 'Composite', maxPressure: '16 bar' },
-  },
-  {
-    brand: Brand.MANAS,
-    modelCode: 'MNS-US-DN25',
-    meterType: MeterType.ULTRASONIC,
-    dialType: DialType.DRY,
-    connectionType: ConnectionType.FLANGE,
-    mountingType: MountingType.HORIZONTAL,
-    temperatureType: TemperatureType.T30,
-    diameter: 25,
-    length: 260,
-    width: 90,
-    height: 110,
-    q1: 0.025,
-    q2: 0.04,
-    q3: 6.3,
-    q4: 7.875,
-    rValue: 250,
-    pressureLoss: 0.025,
-    ipRating: IPRating.IP68,
-    communicationModule: CommunicationModule.INTEGRATED,
-    specifications: { material: 'Stainless Steel', maxPressure: '16 bar', noMovingParts: true },
-  },
-];
+async function teardown(): Promise<void> {
+  console.log('\n🧹 PART A: TEARDOWN - Cleaning existing data...\n');
 
-// =============================================================================
-// MAIN SEED FUNCTION
-// =============================================================================
-async function main() {
-  console.log('🌱 Starting database seed...\n');
+  // Order matters for FK constraints
+  const teardownSteps = [
+    { name: 'Readings', action: async () => { await prisma.$executeRawUnsafe('TRUNCATE TABLE "readings" CASCADE;'); }},
+    { name: 'Alarms', action: async () => { await prisma.alarm.deleteMany(); }},
+    { name: 'ActivityLogs', action: async () => { await prisma.activityLog.deleteMany(); }},
+    { name: 'Meters', action: async () => { await prisma.meter.deleteMany(); }},
+    { name: 'Devices', action: async () => { await prisma.device.deleteMany(); }},
+    { name: 'Customers', action: async () => { await prisma.customer.deleteMany(); }},
+    { name: 'RefreshTokens', action: async () => { await prisma.refreshToken.deleteMany(); }},
+    { name: 'UserTenants', action: async () => { await prisma.userTenant.deleteMany(); }},
+    { name: 'Users', action: async () => { await prisma.user.deleteMany(); }},
+    { name: 'Settings', action: async () => { await prisma.setting.deleteMany(); }},
+    { name: 'MeterProfiles (disconnect relations)', action: async () => { 
+      await prisma.$executeRawUnsafe('DELETE FROM "_TenantAllowedProfiles";');
+      await prisma.$executeRawUnsafe('DELETE FROM "_CompatibleDeviceProfiles";');
+    }},
+    { name: 'MeterProfiles', action: async () => { await prisma.meterProfile.deleteMany(); }},
+    { name: 'DeviceProfiles', action: async () => { await prisma.deviceProfile.deleteMany(); }},
+    { name: 'CommunicationTechFieldDefs', action: async () => { await prisma.communicationTechFieldDef.deleteMany(); }},
+    { name: 'Tenants', action: async () => { await prisma.tenant.deleteMany(); }},
+  ];
 
-  // ---------------------------------------------------------------------------
-  // 1. Seed Communication Technology Field Definitions
-  // ---------------------------------------------------------------------------
-  console.log('📡 Seeding Communication Technology Field Definitions...');
-  
-  for (const techDef of communicationTechFieldDefs) {
-    await prisma.communicationTechFieldDef.upsert({
-      where: { technology: techDef.technology },
-      update: {
-        fields: techDef.fields,
-        integrationTypes: techDef.integrationTypes,
-      },
-      create: {
-        technology: techDef.technology,
-        fields: techDef.fields,
-        integrationTypes: techDef.integrationTypes,
-      },
-    });
-    console.log(`   ✓ ${techDef.technology}`);
+  for (const step of teardownSteps) {
+    try {
+      await step.action();
+      console.log(`   ✓ Cleaned: ${step.name}`);
+    } catch (error) {
+      console.log(`   ⚠ Warning cleaning ${step.name}:`, (error as Error).message);
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // 2. Create Root Tenant
-  // ---------------------------------------------------------------------------
-  console.log('\n🏢 Creating Root Tenant...');
+  console.log('\n   ✓ Teardown complete!\n');
+}
 
-  const rootTenant = await prisma.tenant.upsert({
-    where: { path: 'Root' },
-    update: {},
-    create: {
-      path: 'Root',
+// =============================================================================
+// PART B: DATA CREATION
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// B.1: Create Tenants (ltree)
+// -----------------------------------------------------------------------------
+async function createTenants() {
+  console.log('🏢 Creating Tenants...');
+
+  const tenants = [
+    {
+      path: 'root',
       name: 'Read Water Platform',
       contactFirstName: 'System',
       contactLastName: 'Administrator',
@@ -543,742 +166,1036 @@ async function main() {
         neighborhood: 'Caferağa',
         street: 'Moda Caddesi',
         buildingNo: '1',
-        floor: '1',
-        doorNo: '1',
-        postalCode: '34710',
-        extraDetails: 'Read Water Platform Headquarters',
       },
-      settings: {
-        theme: 'light',
-        language: 'en',
+    },
+    {
+      path: 'root.aski',
+      name: 'ASKİ - Ankara Su ve Kanalizasyon İdaresi',
+      contactFirstName: 'ASKİ',
+      contactLastName: 'Yetkili',
+      contactEmail: 'aski.yetkili@example.com',
+      contactPhone: '+908887776655',
+      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      subscriptionPlan: 'enterprise',
+      latitude: ASKI_BASE_LAT,
+      longitude: ASKI_BASE_LNG,
+      address: {
+        city: 'Ankara',
+        district: 'Çankaya',
+        neighborhood: 'Kızılay',
+        street: 'ASKİ Caddesi',
+        buildingNo: '1',
+      },
+    },
+    {
+      path: 'root.hatsu',
+      name: 'HATSU - Hatay Su ve Kanalizasyon İdaresi',
+      contactFirstName: 'HATSU',
+      contactLastName: 'Yetkili',
+      contactEmail: 'hatsu.yetkili@example.com',
+      contactPhone: '+907776665544',
+      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      subscriptionPlan: 'enterprise',
+      latitude: HATSU_BASE_LAT,
+      longitude: HATSU_BASE_LNG,
+      address: {
+        city: 'Hatay',
+        district: 'Antakya',
+        neighborhood: 'Merkez',
+        street: 'HATSU Caddesi',
+        buildingNo: '1',
+      },
+    },
+  ];
+
+  const createdTenants: Record<string, string> = {};
+
+  for (const tenant of tenants) {
+    const created = await prisma.tenant.create({
+      data: {
+        path: tenant.path,
+        name: tenant.name,
+        contactFirstName: tenant.contactFirstName,
+        contactLastName: tenant.contactLastName,
+        contactEmail: tenant.contactEmail,
+        contactPhone: tenant.contactPhone,
+        subscriptionStatus: tenant.subscriptionStatus,
+        subscriptionPlan: tenant.subscriptionPlan,
+        latitude: tenant.latitude,
+        longitude: tenant.longitude,
+        address: tenant.address,
+      },
+    });
+    createdTenants[tenant.path] = created.id;
+    console.log(`   ✓ ${tenant.name} (${tenant.path})`);
+  }
+
+  // Set parent relationships
+  const rootId = createdTenants['root'];
+  await prisma.tenant.update({ where: { id: createdTenants['root.aski'] }, data: { parentId: rootId } });
+  await prisma.tenant.update({ where: { id: createdTenants['root.hatsu'] }, data: { parentId: rootId } });
+
+  return createdTenants;
+}
+
+// -----------------------------------------------------------------------------
+// B.2: Create Users
+// -----------------------------------------------------------------------------
+async function createUsers(tenants: Record<string, string>) {
+  console.log('\n👤 Creating Users...');
+
+  const passwordHash = await bcrypt.hash(PASSWORD, SALT_ROUNDS);
+
+  const users = [
+    {
+      firstName: 'Super',
+      lastName: 'Admin',
+      email: 'super.admin@example.com',
+      phone: '+909998887766',
+      tcIdNo: '12345678901',
+      tenantPath: 'root',
+      role: SystemRole.PLATFORM_ADMIN,
+    },
+    {
+      firstName: 'ASKİ',
+      lastName: 'Yetkili',
+      email: 'aski.yetkili@example.com',
+      phone: '+908887776655',
+      tcIdNo: '12345678902',
+      tenantPath: 'root.aski',
+      role: SystemRole.TENANT_ADMIN,
+    },
+    {
+      firstName: 'HATSU',
+      lastName: 'Yetkili',
+      email: 'hatsu.yetkili@example.com',
+      phone: '+907776665544',
+      tcIdNo: '12345678903',
+      tenantPath: 'root.hatsu',
+      role: SystemRole.TENANT_ADMIN,
+    },
+  ];
+
+  for (const userData of users) {
+    const user = await prisma.user.create({
+      data: {
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        email: userData.email,
+        phone: userData.phone,
+        tcIdNo: userData.tcIdNo,
+        passwordHash,
+        isActive: true,
+        language: 'tr',
         timezone: 'Europe/Istanbul',
       },
-    },
-  });
+    });
 
-  console.log(`   ✓ Root Tenant created: ${rootTenant.name} (${rootTenant.id})`);
-
-  // ---------------------------------------------------------------------------
-  // 3. Create Platform Admin User
-  // ---------------------------------------------------------------------------
-  console.log('\n👤 Creating Platform Admin User...');
-
-  // Hash password: "Admin@123" (change in production!)
-  const saltRounds = 10;
-  const passwordHash = await bcrypt.hash('Admin@123', saltRounds);
-
-  const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@readwater.io' },
-    update: {
-      passwordHash,
-    },
-    create: {
-      firstName: 'Platform',
-      lastName: 'Admin',
-      email: 'admin@readwater.io',
-      phone: '+905001234567',
-      passwordHash,
-      isActive: true,
-      language: 'en',
-      timezone: 'Europe/Istanbul',
-      metadata: {
-        createdBy: 'seed',
-        isSystemUser: true,
+    await prisma.userTenant.create({
+      data: {
+        userId: user.id,
+        tenantId: tenants[userData.tenantPath],
+        role: userData.role,
       },
-    },
-  });
+    });
 
-  console.log(`   ✓ Admin User created: ${adminUser.firstName} ${adminUser.lastName} (${adminUser.email})`);
+    console.log(`   ✓ ${userData.email} (${userData.role} @ ${userData.tenantPath})`);
+  }
+}
 
-  // ---------------------------------------------------------------------------
-  // 4. Assign Platform Admin Role to Root Tenant
-  // ---------------------------------------------------------------------------
-  console.log('\n🔑 Assigning Platform Admin role...');
+// -----------------------------------------------------------------------------
+// B.3: Create Communication Tech Field Definitions
+// -----------------------------------------------------------------------------
+async function createCommunicationTechDefs() {
+  console.log('\n📡 Creating Communication Technology Field Definitions...');
 
-  await prisma.userTenant.upsert({
-    where: {
-      userId_tenantId: {
-        userId: adminUser.id,
-        tenantId: rootTenant.id,
-      },
-    },
-    update: {
-      role: SystemRole.PLATFORM_ADMIN,
-    },
-    create: {
-      userId: adminUser.id,
-      tenantId: rootTenant.id,
-      role: SystemRole.PLATFORM_ADMIN,
-      permissions: [
-        'tenant.create',
-        'tenant.read',
-        'tenant.update',
-        'tenant.delete',
-        'user.create',
-        'user.read',
-        'user.update',
-        'user.delete',
-        'meter.create',
-        'meter.read',
-        'meter.update',
-        'meter.delete',
-        'reading.read',
-        'reading.export',
-        'valve.control',
-        'customer.create',
-        'customer.read',
-        'customer.update',
-        'customer.delete',
-        'profile.create',
-        'profile.read',
-        'profile.update',
-        'profile.delete',
-        'device.create',
-        'device.read',
-        'device.update',
-        'device.delete',
-        'settings.read',
-        'settings.update',
+  const techDefs = [
+    {
+      technology: CommunicationTechnology.LORAWAN,
+      integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
+      fields: [
+        { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
       ],
     },
-  });
-
-  console.log(`   ✓ Platform Admin role assigned to ${adminUser.email}`);
-
-  // ---------------------------------------------------------------------------
-  // 5. Create Device Profiles (with Decoder Functions)
-  // ---------------------------------------------------------------------------
-  console.log('\n📱 Creating Device Profiles...');
-
-  const createdDeviceProfiles: Record<string, { id: string; brand: DeviceBrand; modelCode: string }> = {};
-
-  for (const profile of deviceProfiles) {
-    const deviceProfile = await prisma.deviceProfile.upsert({
-      where: {
-        brand_modelCode: {
-          brand: profile.brand,
-          modelCode: profile.modelCode,
-        },
-      },
-      update: {
-        fieldDefinitions: profile.fieldDefinitions,
-        decoderFunction: profile.decoderFunction,
-        testPayload: profile.testPayload,
-        expectedOutput: profile.expectedOutput,
-        batteryLifeMonths: profile.batteryLifeMonths,
-        specifications: profile.specifications,
-        integrationType: profile.integrationType,
-      },
-      create: {
-        brand: profile.brand,
-        modelCode: profile.modelCode,
-        communicationTechnology: profile.communicationTechnology,
-        integrationType: profile.integrationType,
-        fieldDefinitions: profile.fieldDefinitions,
-        decoderFunction: profile.decoderFunction,
-        testPayload: profile.testPayload,
-        expectedOutput: profile.expectedOutput,
-        batteryLifeMonths: profile.batteryLifeMonths,
-        specifications: profile.specifications,
-      },
-    });
-    createdDeviceProfiles[`${profile.brand}-${profile.modelCode}`] = {
-      id: deviceProfile.id,
-      brand: profile.brand,
-      modelCode: profile.modelCode,
-    };
-    console.log(`   ✓ ${profile.brand} ${profile.modelCode} (${profile.communicationTechnology})`);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6. Create Meter Profiles
-  // ---------------------------------------------------------------------------
-  console.log('\n📊 Creating Meter Profiles...');
-
-  const createdMeterProfiles: Record<string, { id: string; brand: Brand; modelCode: string }> = {};
-
-  for (const profile of meterProfiles) {
-    const meterProfile = await prisma.meterProfile.upsert({
-      where: {
-        brand_modelCode: {
-          brand: profile.brand,
-          modelCode: profile.modelCode,
-        },
-      },
-      update: {
-        specifications: profile.specifications,
-      },
-      create: {
-        brand: profile.brand,
-        modelCode: profile.modelCode,
-        meterType: profile.meterType,
-        dialType: profile.dialType,
-        connectionType: profile.connectionType,
-        mountingType: profile.mountingType,
-        temperatureType: profile.temperatureType,
-        diameter: profile.diameter,
-        length: profile.length,
-        width: profile.width,
-        height: profile.height,
-        q1: profile.q1,
-        q2: profile.q2,
-        q3: profile.q3,
-        q4: profile.q4,
-        rValue: profile.rValue,
-        pressureLoss: profile.pressureLoss,
-        ipRating: profile.ipRating,
-        communicationModule: profile.communicationModule,
-        specifications: profile.specifications,
-      },
-    });
-    createdMeterProfiles[`${profile.brand}-${profile.modelCode}`] = {
-      id: meterProfile.id,
-      brand: profile.brand,
-      modelCode: profile.modelCode,
-    };
-    console.log(`   ✓ ${profile.brand} ${profile.modelCode}`);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 7. Create Compatible Device Profile Relationships
-  // ---------------------------------------------------------------------------
-  console.log('\n🔗 Creating Compatible Device Profile Relationships...');
-
-  // BAYLAN meters are compatible with UNA and IMA devices
-  const baylanProfile = createdMeterProfiles['BAYLAN-TK-3S-DN15'];
-  const unaProfile = createdDeviceProfiles['UNA-UNA-LORA-01'];
-  const imaProfile = createdDeviceProfiles['IMA-IMA-SIGFOX-01'];
-
-  if (baylanProfile && unaProfile) {
-    await prisma.meterProfile.update({
-      where: { id: baylanProfile.id },
-      data: {
-        compatibleDeviceProfiles: {
-          connect: [{ id: unaProfile.id }],
-        },
-      },
-    });
-    console.log(`   ✓ BAYLAN TK-3S-DN15 <-> UNA UNA-LORA-01`);
-  }
-
-  if (baylanProfile && imaProfile) {
-    await prisma.meterProfile.update({
-      where: { id: baylanProfile.id },
-      data: {
-        compatibleDeviceProfiles: {
-          connect: [{ id: imaProfile.id }],
-        },
-      },
-    });
-    console.log(`   ✓ BAYLAN TK-3S-DN15 <-> IMA IMA-SIGFOX-01`);
-  }
-
-  // ZENNER meters are compatible with ZENNER wM-Bus and ITRON NB-IoT devices
-  const zennerMeterProfile = createdMeterProfiles['ZENNER-MTKD-N-DN20'];
-  const zennerDeviceProfile = createdDeviceProfiles['ZENNER-ZENNER-WMBUS-01'];
-  const itronProfile = createdDeviceProfiles['ITRON-ITRON-NBIOT-01'];
-
-  if (zennerMeterProfile && zennerDeviceProfile) {
-    await prisma.meterProfile.update({
-      where: { id: zennerMeterProfile.id },
-      data: {
-        compatibleDeviceProfiles: {
-          connect: [{ id: zennerDeviceProfile.id }],
-        },
-      },
-    });
-    console.log(`   ✓ ZENNER MTKD-N-DN20 <-> ZENNER ZENNER-WMBUS-01`);
-  }
-
-  if (zennerMeterProfile && itronProfile) {
-    await prisma.meterProfile.update({
-      where: { id: zennerMeterProfile.id },
-      data: {
-        compatibleDeviceProfiles: {
-          connect: [{ id: itronProfile.id }],
-        },
-      },
-    });
-    console.log(`   ✓ ZENNER MTKD-N-DN20 <-> ITRON ITRON-NBIOT-01`);
-  }
-
-  // MANAS ultrasonic meters are compatible with all device profiles
-  const manasProfile = createdMeterProfiles['MANAS-MNS-US-DN25'];
-  if (manasProfile) {
-    const allDeviceProfileIds = Object.values(createdDeviceProfiles).map(p => ({ id: p.id }));
-    await prisma.meterProfile.update({
-      where: { id: manasProfile.id },
-      data: {
-        compatibleDeviceProfiles: {
-          connect: allDeviceProfileIds,
-        },
-      },
-    });
-    console.log(`   ✓ MANAS MNS-US-DN25 <-> All Device Profiles`);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 8. Create Sample Warehouse Devices
-  // ---------------------------------------------------------------------------
-  console.log('\n📦 Creating Sample Warehouse Devices...');
-
-  // Get device profile IDs
-  const unaDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.UNA)?.id;
-  const imaDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.IMA)?.id;
-  const itronDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.ITRON)?.id;
-  const zennerDeviceProfileId = Object.values(createdDeviceProfiles).find(p => p.brand === DeviceBrand.ZENNER)?.id;
-
-  const warehouseDevices = [
-    // UNA LoRaWAN devices
-    ...(unaDeviceProfileId
-      ? [
-          {
-            serialNumber: 'UNA-LW-001',
-            deviceProfileId: unaDeviceProfileId,
-            dynamicFields: {
-              DevEUI: '0011223344556677',
-              JoinEUI: 'AABBCCDD11223344',
-              AppKey: '00112233445566778899AABBCCDDEEFF',
-            },
-          },
-          {
-            serialNumber: 'UNA-LW-002',
-            deviceProfileId: unaDeviceProfileId,
-            dynamicFields: {
-              DevEUI: '1122334455667788',
-              JoinEUI: 'AABBCCDD11223344',
-              AppKey: '11223344556677889900AABBCCDDEEFF',
-            },
-          },
-          {
-            serialNumber: 'UNA-LW-003',
-            deviceProfileId: unaDeviceProfileId,
-            dynamicFields: {
-              DevEUI: '2233445566778899',
-              JoinEUI: 'AABBCCDD11223344',
-              AppKey: '22334455667788990011AABBCCDDEEFF',
-            },
-          },
-        ]
-      : []),
-    // IMA Sigfox devices
-    ...(imaDeviceProfileId
-      ? [
-          {
-            serialNumber: 'IMA-SF-001',
-            deviceProfileId: imaDeviceProfileId,
-            dynamicFields: {
-              ID: 'AABBCCDD',
-              PAC: '1122334455667788',
-            },
-          },
-          {
-            serialNumber: 'IMA-SF-002',
-            deviceProfileId: imaDeviceProfileId,
-            dynamicFields: {
-              ID: 'EEFF0011',
-              PAC: '2233445566778899',
-            },
-          },
-        ]
-      : []),
-    // ITRON NB-IoT devices
-    ...(itronDeviceProfileId
-      ? [
-          {
-            serialNumber: 'ITRON-NB-001',
-            deviceProfileId: itronDeviceProfileId,
-            dynamicFields: {
-              IMEI: '123456789012345',
-              IMSI: '234567890123456',
-              ICCID: '89012345678901234567',
-            },
-          },
-          {
-            serialNumber: 'ITRON-NB-002',
-            deviceProfileId: itronDeviceProfileId,
-            dynamicFields: {
-              IMEI: '234567890123456',
-              IMSI: '345678901234567',
-              ICCID: '89123456789012345678',
-            },
-          },
-        ]
-      : []),
-    // ZENNER wM-Bus devices
-    ...(zennerDeviceProfileId
-      ? [
-          {
-            serialNumber: 'ZEN-WMB-001',
-            deviceProfileId: zennerDeviceProfileId,
-            dynamicFields: {
-              ManufacturerId: 'ZEN',
-              DeviceId: 'AABBCCDD',
-              EncryptionKey: '00112233445566778899AABBCCDDEEFF',
-            },
-          },
-          {
-            serialNumber: 'ZEN-WMB-002',
-            deviceProfileId: zennerDeviceProfileId,
-            dynamicFields: {
-              ManufacturerId: 'ZEN',
-              DeviceId: 'EEFF0011',
-              EncryptionKey: '11223344556677889900AABBCCDDEEFF',
-            },
-          },
-        ]
-      : []),
-  ];
-
-  for (const device of warehouseDevices) {
-    await prisma.device.upsert({
-      where: { serialNumber: device.serialNumber },
-      update: {
-        dynamicFields: device.dynamicFields,
-      },
-      create: {
-        serialNumber: device.serialNumber,
-        tenantId: rootTenant.id,
-        deviceProfileId: device.deviceProfileId,
-        status: DeviceStatus.WAREHOUSE,
-        dynamicFields: device.dynamicFields,
-        metadata: {
-          createdBy: 'seed',
-          batchNumber: 'SEED-2024-001',
-        },
-      },
-    });
-    console.log(`   ✓ ${device.serialNumber} (WAREHOUSE)`);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 9. Link Meter Profiles to Root Tenant (Allowed Profiles)
-  // ---------------------------------------------------------------------------
-  console.log('\n🔗 Linking Meter Profiles to Root Tenant...');
-
-  const allMeterProfileIds = Object.values(createdMeterProfiles).map(p => ({ id: p.id }));
-  await prisma.tenant.update({
-    where: { id: rootTenant.id },
-    data: {
-      allowedProfiles: {
-        connect: allMeterProfileIds,
-      },
-    },
-  });
-  console.log(`   ✓ Linked ${allMeterProfileIds.length} Meter Profiles to ${rootTenant.name}`);
-
-  // ---------------------------------------------------------------------------
-  // 10. Create Sample Customers
-  // ---------------------------------------------------------------------------
-  console.log('\n👥 Creating Sample Customers...');
-
-  const sampleCustomers = [
     {
-      customerType: 'INDIVIDUAL' as const,
-      consumptionType: 'NORMAL' as const,
-      details: {
-        firstName: 'Ahmet',
-        lastName: 'Yılmaz',
-        tcIdNo: '12345678901',
-        phone: '+905551234567',
-        email: 'ahmet.yilmaz@example.com',
-      },
-      address: {
-        city: 'Istanbul',
-        district: 'Kadıköy',
-        neighborhood: 'Caferağa',
-        street: 'Moda Caddesi',
-        buildingNo: '42',
-        floor: '3',
-        doorNo: '7',
-        postalCode: '34710',
-        extraDetails: 'Near Moda Park',
-      },
-      latitude: 40.9876,
-      longitude: 29.0234,
+      technology: CommunicationTechnology.SIGFOX,
+      integrationTypes: [IntegrationType.HTTP, IntegrationType.API],
+      fields: [
+        { name: 'ID', type: 'hex', length: 8, regex: '^[a-fA-F0-9]{8}$', required: true },
+        { name: 'PAC', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+      ],
     },
     {
-      customerType: 'INDIVIDUAL' as const,
-      consumptionType: 'HIGH' as const,
-      details: {
-        firstName: 'Fatma',
-        lastName: 'Demir',
-        tcIdNo: '23456789012',
-        phone: '+905552345678',
-        email: 'fatma.demir@example.com',
-      },
-      address: {
-        city: 'Istanbul',
-        district: 'Beşiktaş',
-        neighborhood: 'Levent',
-        street: 'Büyükdere Caddesi',
-        buildingNo: '100',
-        floor: '15',
-        doorNo: '1501',
-        postalCode: '34394',
-        extraDetails: 'Levent Plaza',
-      },
-      latitude: 41.0821,
-      longitude: 29.0115,
-    },
-    {
-      customerType: 'ORGANIZATIONAL' as const,
-      consumptionType: 'HIGH' as const,
-      details: {
-        organizationName: 'ABC Su Sanayi A.Ş.',
-        taxId: '1234567890',
-        taxOffice: 'Kadıköy',
-        contactFirstName: 'Mehmet',
-        contactLastName: 'Öztürk',
-        contactPhone: '+905553456789',
-        contactEmail: 'mehmet.ozturk@abcsu.com',
-      },
-      address: {
-        city: 'Istanbul',
-        district: 'Tuzla',
-        neighborhood: 'Organize Sanayi',
-        street: '2. Cadde',
-        buildingNo: '15',
-        floor: '1',
-        doorNo: '1',
-        postalCode: '34956',
-        extraDetails: 'ABC Su Factory',
-      },
-      latitude: 40.8234,
-      longitude: 29.2987,
+      technology: CommunicationTechnology.NB_IOT,
+      integrationTypes: [IntegrationType.MQTT, IntegrationType.HTTP, IntegrationType.API],
+      fields: [
+        { name: 'IMEI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: true },
+        { name: 'IMSI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: false },
+      ],
     },
   ];
 
-  const createdCustomers: Array<{ id: string; name: string }> = [];
-
-  for (const customer of sampleCustomers) {
-    const created = await prisma.customer.upsert({
-      where: {
-        id: '00000000-0000-0000-0000-000000000000', // Will never match, forces create
-      },
-      update: {},
-      create: {
-        tenantId: rootTenant.id,
-        customerType: customer.customerType,
-        consumptionType: customer.consumptionType,
-        details: customer.details,
-        address: customer.address,
-        latitude: customer.latitude,
-        longitude: customer.longitude,
-      },
-    });
-    const customerName = customer.customerType === 'INDIVIDUAL'
-      ? `${(customer.details as any).firstName} ${(customer.details as any).lastName}`
-      : (customer.details as any).organizationName;
-    createdCustomers.push({ id: created.id, name: customerName });
-    console.log(`   ✓ ${customerName} (${customer.customerType})`);
+  for (const def of techDefs) {
+    await prisma.communicationTechFieldDef.create({ data: def });
+    console.log(`   ✓ ${def.technology}`);
   }
+}
 
-  // ---------------------------------------------------------------------------
-  // 11. Create Sample Meters Linked to Customers
-  // ---------------------------------------------------------------------------
-  console.log('\n📊 Creating Sample Meters Linked to Customers...');
+// -----------------------------------------------------------------------------
+// B.4: Create Meter Profiles (10 Total)
+// Per Seed 2 spec:
+// - 2 Manas → HATSU
+// - 2 Itron → HATSU + ASKİ
+// - 2 Baylan → HATSU + ASKİ
+// - 2 Zenner → HATSU
+// - 1 Cem → HATSU
+// - 1 Klepsan → HATSU
+// Note: ASKİ needs access to all profiles used in ASKİ batches
+// -----------------------------------------------------------------------------
+async function createMeterProfiles(tenants: Record<string, string>) {
+  console.log('\n📊 Creating Meter Profiles (10 Total)...');
 
-  // Get first customer and first meter profile
-  const firstCustomer = createdCustomers[0];
-  const secondCustomer = createdCustomers[1];
-  const thirdCustomer = createdCustomers[2];
-  const baylanMeterProfileId = createdMeterProfiles['BAYLAN-TK-3S-DN15']?.id;
-  const zennerMeterProfileId = createdMeterProfiles['ZENNER-MTKD-N-DN20']?.id;
-  const manasMeterProfileId = createdMeterProfiles['MANAS-MNS-US-DN25']?.id;
+  const hatsuId = tenants['root.hatsu'];
+  const askiId = tenants['root.aski'];
 
-  const sampleMeters = [
+  const meterProfilesData = [
+    // [0] Manas_A (View: HATSU + ASKİ - needed for ASKİ batch)
     {
-      customerId: firstCustomer.id,
-      meterProfileId: baylanMeterProfileId!,
-      serialNumber: 'MTR-2024-001',
-      initialIndex: 0,
-      installationDate: new Date('2024-01-15T08:00:00Z'),
-      status: 'ACTIVE' as const,
-      address: {
-        city: 'Istanbul',
-        district: 'Kadıköy',
-        neighborhood: 'Caferağa',
-        street: 'Moda Caddesi',
-        buildingNo: '42',
-        floor: 'B1',
-        doorNo: 'SU-1',
-        postalCode: '34710',
-        extraDetails: 'Meter Room',
-      },
-      latitude: 40.9876,
-      longitude: 29.0234,
+      brand: Brand.MANAS,
+      modelCode: 'MNS-A-DN15',
+      meterType: MeterType.MULTI_JET,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.HORIZONTAL,
+      temperatureType: TemperatureType.T30,
+      diameter: 15,
+      q3: 2.5,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId, askiId],
     },
+    // [1] Manas_B (View: HATSU + ASKİ - needed for ASKİ batch)
     {
-      customerId: secondCustomer.id,
-      meterProfileId: zennerMeterProfileId!,
-      serialNumber: 'MTR-2024-002',
-      initialIndex: 1234.567,
-      installationDate: new Date('2024-02-20T10:30:00Z'),
-      status: 'ACTIVE' as const,
-      address: {
-        city: 'Istanbul',
-        district: 'Beşiktaş',
-        neighborhood: 'Levent',
-        street: 'Büyükdere Caddesi',
-        buildingNo: '100',
-        floor: 'B2',
-        doorNo: 'SU-15',
-        postalCode: '34394',
-        extraDetails: 'Building Water Meter',
-      },
-      latitude: 41.0821,
-      longitude: 29.0115,
+      brand: Brand.MANAS,
+      modelCode: 'MNS-B-DN20',
+      meterType: MeterType.ULTRASONIC,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.BOTH,
+      temperatureType: TemperatureType.T30,
+      diameter: 20,
+      q3: 4.0,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.INTEGRATED,
+      allowedTenants: [hatsuId, askiId],
     },
+    // [2] Itron_A (View: HATSU + ASKİ)
     {
-      customerId: thirdCustomer.id,
-      meterProfileId: manasMeterProfileId!,
-      serialNumber: 'MTR-2024-003',
-      initialIndex: 98765.432,
-      installationDate: new Date('2024-03-10T14:00:00Z'),
-      status: 'ACTIVE' as const,
-      address: {
-        city: 'Istanbul',
-        district: 'Tuzla',
-        neighborhood: 'Organize Sanayi',
-        street: '2. Cadde',
-        buildingNo: '15',
-        floor: '1',
-        doorNo: 'MAIN',
-        postalCode: '34956',
-        extraDetails: 'Factory Main Water Meter',
-      },
-      latitude: 40.8234,
-      longitude: 29.2987,
+      brand: Brand.ITRON,
+      modelCode: 'ITR-A-DN15',
+      meterType: MeterType.SINGLE_JET,
+      dialType: DialType.SUPER_DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.HORIZONTAL,
+      temperatureType: TemperatureType.T30,
+      diameter: 15,
+      q3: 2.5,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [3] Itron_B (View: HATSU + ASKİ)
+    {
+      brand: Brand.ITRON,
+      modelCode: 'ITR-B-DN20',
+      meterType: MeterType.MULTI_JET,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.BOTH,
+      temperatureType: TemperatureType.T30,
+      diameter: 20,
+      q3: 4.0,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [4] Baylan_A (View: HATSU + ASKİ)
+    {
+      brand: Brand.BAYLAN,
+      modelCode: 'BYL-A-DN15',
+      meterType: MeterType.MULTI_JET,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.HORIZONTAL,
+      temperatureType: TemperatureType.T30,
+      diameter: 15,
+      q3: 2.5,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [5] Baylan_B (View: HATSU + ASKİ)
+    {
+      brand: Brand.BAYLAN,
+      modelCode: 'BYL-B-DN20',
+      meterType: MeterType.MULTI_JET,
+      dialType: DialType.SUPER_DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.BOTH,
+      temperatureType: TemperatureType.T30,
+      diameter: 20,
+      q3: 4.0,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [6] Zenner_A (View: HATSU + ASKİ - needed for ASKİ batch)
+    {
+      brand: Brand.ZENNER,
+      modelCode: 'ZEN-A-DN15',
+      meterType: MeterType.MULTI_JET,
+      dialType: DialType.SUPER_DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.HORIZONTAL,
+      temperatureType: TemperatureType.T30,
+      diameter: 15,
+      q3: 2.5,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.INTEGRATED,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [7] Zenner_B (View: HATSU + ASKİ - needed for ASKİ batch)
+    {
+      brand: Brand.ZENNER,
+      modelCode: 'ZEN-B-DN20',
+      meterType: MeterType.ULTRASONIC,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.BOTH,
+      temperatureType: TemperatureType.T30,
+      diameter: 20,
+      q3: 4.0,
+      ipRating: IPRating.IP68,
+      communicationModule: CommunicationModule.INTEGRATED,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [8] Cem_A (View: HATSU + ASKİ - needed for ASKİ batch)
+    {
+      brand: Brand.CEM,
+      modelCode: 'CEM-A-DN15',
+      meterType: MeterType.SINGLE_JET,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.HORIZONTAL,
+      temperatureType: TemperatureType.T30,
+      diameter: 15,
+      q3: 2.5,
+      ipRating: IPRating.IP67,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId, askiId],
+    },
+    // [9] Klepsan_A (View: HATSU)
+    {
+      brand: Brand.KLEPSAN,
+      modelCode: 'KLP-A-DN15',
+      meterType: MeterType.MULTI_JET,
+      dialType: DialType.DRY,
+      connectionType: ConnectionType.THREAD,
+      mountingType: MountingType.HORIZONTAL,
+      temperatureType: TemperatureType.T30,
+      diameter: 15,
+      q3: 2.5,
+      ipRating: IPRating.IP67,
+      communicationModule: CommunicationModule.RETROFIT,
+      allowedTenants: [hatsuId],
     },
   ];
 
-  const createdMeters: Array<{ id: string; serialNumber: string }> = [];
+  const meterProfiles: string[] = [];
 
-  for (const meter of sampleMeters) {
-    if (!meter.meterProfileId) {
-      console.log(`   ⚠ Skipping meter - no profile found`);
-      continue;
+  for (let i = 0; i < meterProfilesData.length; i++) {
+    const { allowedTenants, ...profileData } = meterProfilesData[i];
+    const created = await prisma.meterProfile.create({
+      data: {
+        ...profileData,
+        allowedTenants: { connect: allowedTenants.map(id => ({ id })) },
+      },
+    });
+    meterProfiles.push(created.id);
+    console.log(`   ✓ [${i}] ${profileData.brand} ${profileData.modelCode}`);
+  }
+
+  return meterProfiles;
+}
+
+// -----------------------------------------------------------------------------
+// B.5: Create Device Profiles (7 Total)
+// Per Seed 2 spec:
+// - 1 Manas | Manas + Itron compat | HATSU + ASKİ
+// - 1 Itron | Manas + Itron compat | HATSU + ASKİ
+// - 1 Baylan | Baylan compat | HATSU + ASKİ
+// - 1 Cem | Cem compat | HATSU
+// - 1 Klepsan | Klepsan compat | HATSU
+// - 1 Ima | All compat | HATSU + ASKİ
+// - 1 Codigno | Manas + Itron compat | HATSU + ASKİ
+// -----------------------------------------------------------------------------
+async function createDeviceProfiles(meterProfiles: string[]) {
+  console.log('\n📱 Creating Device Profiles (7 Total)...');
+
+  const deviceProfilesData = [
+    // [0] Manas_Dev - Compatible with Manas + Itron profiles
+    {
+      brand: DeviceBrand.MANAS,
+      modelCode: 'MNS-DEV-LW01',
+      communicationTechnology: CommunicationTechnology.LORAWAN,
+      integrationType: IntegrationType.MQTT,
+      fieldDefinitions: [
+        { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
+      ],
+      decoderFunction: 'function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }',
+      batteryLifeMonths: 120,
+      compatibleMeterProfiles: [meterProfiles[0], meterProfiles[1], meterProfiles[2], meterProfiles[3]],
+    },
+    // [1] Itron_Dev - Compatible with Manas + Itron profiles
+    {
+      brand: DeviceBrand.ITRON,
+      modelCode: 'ITR-DEV-NB01',
+      communicationTechnology: CommunicationTechnology.NB_IOT,
+      integrationType: IntegrationType.HTTP,
+      fieldDefinitions: [
+        { name: 'IMEI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: true },
+        { name: 'IMSI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: false },
+      ],
+      decoderFunction: 'function decode(payload) { const d = JSON.parse(payload); return { value: d.reading / 1000 }; }',
+      batteryLifeMonths: 84,
+      compatibleMeterProfiles: [meterProfiles[0], meterProfiles[1], meterProfiles[2], meterProfiles[3]],
+    },
+    // [2] Baylan_Dev - Compatible with Baylan profiles
+    {
+      brand: DeviceBrand.BAYLAN,
+      modelCode: 'BYL-DEV-LW01',
+      communicationTechnology: CommunicationTechnology.LORAWAN,
+      integrationType: IntegrationType.MQTT,
+      fieldDefinitions: [
+        { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
+      ],
+      decoderFunction: 'function decode(payload) { return { value: parseInt(payload.slice(0,8), 16) / 1000 }; }',
+      batteryLifeMonths: 96,
+      compatibleMeterProfiles: [meterProfiles[4], meterProfiles[5]],
+    },
+    // [3] Cem_Dev - Compatible with Cem profiles
+    {
+      brand: DeviceBrand.CEM,
+      modelCode: 'CEM-DEV-SF01',
+      communicationTechnology: CommunicationTechnology.SIGFOX,
+      integrationType: IntegrationType.HTTP,
+      fieldDefinitions: [
+        { name: 'ID', type: 'hex', length: 8, regex: '^[a-fA-F0-9]{8}$', required: true },
+        { name: 'PAC', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+      ],
+      decoderFunction: 'function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }',
+      batteryLifeMonths: 60,
+      compatibleMeterProfiles: [meterProfiles[8]],
+    },
+    // [4] Klepsan_Dev - Compatible with Klepsan profiles
+    {
+      brand: DeviceBrand.KLEPSAN,
+      modelCode: 'KLP-DEV-LW01',
+      communicationTechnology: CommunicationTechnology.LORAWAN,
+      integrationType: IntegrationType.MQTT,
+      fieldDefinitions: [
+        { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
+      ],
+      decoderFunction: 'function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }',
+      batteryLifeMonths: 72,
+      compatibleMeterProfiles: [meterProfiles[9]],
+    },
+    // [5] Ima_Dev - Universal compatibility (Manas + Itron + Baylan + Zenner + Cem + Klepsan)
+    {
+      brand: DeviceBrand.IMA,
+      modelCode: 'IMA-DEV-LW01',
+      communicationTechnology: CommunicationTechnology.LORAWAN,
+      integrationType: IntegrationType.MQTT,
+      fieldDefinitions: [
+        { name: 'DevEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'JoinEUI', type: 'hex', length: 16, regex: '^[a-fA-F0-9]{16}$', required: true },
+        { name: 'AppKey', type: 'hex', length: 32, regex: '^[a-fA-F0-9]{32}$', required: true },
+      ],
+      decoderFunction: 'function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }',
+      batteryLifeMonths: 120,
+      compatibleMeterProfiles: meterProfiles, // All profiles
+    },
+    // [6] Codigno_Dev - Compatible with Manas + Itron
+    {
+      brand: DeviceBrand.CODIGNO,
+      modelCode: 'CDG-DEV-NB01',
+      communicationTechnology: CommunicationTechnology.NB_IOT,
+      integrationType: IntegrationType.HTTP,
+      fieldDefinitions: [
+        { name: 'IMEI', type: 'string', length: 15, regex: '^[0-9]{15}$', required: true },
+      ],
+      decoderFunction: 'function decode(payload) { const d = JSON.parse(payload); return { value: d.val / 1000 }; }',
+      batteryLifeMonths: 96,
+      compatibleMeterProfiles: [meterProfiles[0], meterProfiles[1], meterProfiles[2], meterProfiles[3]],
+    },
+  ];
+
+  const deviceProfiles: string[] = [];
+
+  for (let i = 0; i < deviceProfilesData.length; i++) {
+    const { compatibleMeterProfiles, ...profileData } = deviceProfilesData[i];
+    const created = await prisma.deviceProfile.create({
+      data: {
+        ...profileData,
+        compatibleMeterProfiles: { connect: compatibleMeterProfiles.map(id => ({ id })) },
+      },
+    });
+    deviceProfiles.push(created.id);
+    console.log(`   ✓ [${i}] ${profileData.brand} ${profileData.modelCode}`);
+  }
+
+  return deviceProfiles;
+}
+
+// -----------------------------------------------------------------------------
+// B.6: Create Bulk Assets (Devices + Customers + Meters)
+// SEED 2: All batches are 100 units
+// -----------------------------------------------------------------------------
+interface AssetBatch {
+  count: number;
+  meterProfileIdx: number;
+  deviceProfileIdx: number;
+  tenantPath: string;
+  serialPrefix: string;
+}
+
+async function createBulkAssets(
+  tenants: Record<string, string>,
+  meterProfiles: string[],
+  deviceProfiles: string[]
+) {
+  console.log('\n📦 Creating Bulk Assets (Seed 2 - 100 per batch)...\n');
+
+  // Define all batches per Seed 2 specification
+  const batches: AssetBatch[] = [
+    // HATSU Tenant (4 batches × 100 = 400 units)
+    { count: 100, meterProfileIdx: 2, deviceProfileIdx: 1, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-A' },   // Itron[0] + Itron
+    { count: 100, meterProfileIdx: 4, deviceProfileIdx: 2, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-B' },   // Baylan[0] + Baylan
+    { count: 100, meterProfileIdx: 6, deviceProfileIdx: 5, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-C' },   // Zenner[0] + Ima
+    { count: 100, meterProfileIdx: 9, deviceProfileIdx: 4, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-D' },   // Klepsan + Klepsan
+    
+    // ASKİ Tenant (13 batches × 100 = 1,300 units)
+    { count: 100, meterProfileIdx: 0, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-A1' },    // Manas[0] + Itron
+    { count: 100, meterProfileIdx: 0, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-A2' },    // Manas[0] + Ima
+    { count: 100, meterProfileIdx: 1, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-B1' },    // Manas[1] + Itron
+    { count: 100, meterProfileIdx: 1, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-B2' },    // Manas[1] + Ima
+    { count: 100, meterProfileIdx: 2, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-C1' },    // Itron[0] + Itron
+    { count: 100, meterProfileIdx: 2, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-C2' },    // Itron[0] + Ima
+    { count: 100, meterProfileIdx: 3, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-D1' },    // Itron[1] + Itron
+    { count: 100, meterProfileIdx: 3, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-D2' },    // Itron[1] + Ima
+    { count: 100, meterProfileIdx: 4, deviceProfileIdx: 2, tenantPath: 'root.aski', serialPrefix: 'ASKI-E1' },    // Baylan[0] + Baylan
+    { count: 100, meterProfileIdx: 5, deviceProfileIdx: 2, tenantPath: 'root.aski', serialPrefix: 'ASKI-F1' },    // Baylan[1] + Baylan
+    { count: 100, meterProfileIdx: 6, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-G1' },    // Zenner[0] + Ima
+    { count: 100, meterProfileIdx: 7, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-H1' },    // Zenner[1] + Ima
+    { count: 100, meterProfileIdx: 8, deviceProfileIdx: 3, tenantPath: 'root.aski', serialPrefix: 'ASKI-I1' },    // Cem[0] + Cem
+  ];
+
+  let globalDeviceCounter = 0;
+  let globalMeterCounter = 0;
+  let globalCustomerCounter = 0;
+
+  for (const batch of batches) {
+    const tenantId = tenants[batch.tenantPath];
+    const meterProfileId = meterProfiles[batch.meterProfileIdx];
+    const deviceProfileId = deviceProfiles[batch.deviceProfileIdx];
+    const isHatsu = batch.tenantPath === 'root.hatsu';
+    const baseLat = isHatsu ? HATSU_BASE_LAT : ASKI_BASE_LAT;
+    const baseLng = isHatsu ? HATSU_BASE_LNG : ASKI_BASE_LNG;
+
+    console.log(`\n   📍 ${batch.serialPrefix}: ${batch.count} units (MeterProfile[${batch.meterProfileIdx}] + DeviceProfile[${batch.deviceProfileIdx}])`);
+
+    // Generate all data for this batch
+    const items: Array<{
+      deviceSerial: string;
+      meterSerial: string;
+      customerName: string;
+      coords: { lat: number; lng: number };
+      dynamicFields: Record<string, string>;
+    }> = [];
+
+    for (let i = 0; i < batch.count; i++) {
+      globalDeviceCounter++;
+      globalMeterCounter++;
+      globalCustomerCounter++;
+
+      items.push({
+        deviceSerial: generateSerial(`DEV-${batch.serialPrefix}`, globalDeviceCounter),
+        meterSerial: generateSerial(`MTR-${batch.serialPrefix}`, globalMeterCounter),
+        customerName: `Customer ${batch.serialPrefix}-${globalCustomerCounter}`,
+        coords: randomCoordinate(baseLat, baseLng, 15),
+        dynamicFields: {
+          DevEUI: randomHex(16),
+          JoinEUI: randomHex(16),
+          AppKey: randomHex(32),
+        },
+      });
     }
 
-    const created = await prisma.meter.upsert({
-      where: { serialNumber: meter.serialNumber },
-      update: {},
-      create: {
-        tenantId: rootTenant.id,
-        customerId: meter.customerId,
-        meterProfileId: meter.meterProfileId,
-        serialNumber: meter.serialNumber,
-        initialIndex: meter.initialIndex,
-        installationDate: meter.installationDate,
-        status: meter.status,
-        address: meter.address,
-        latitude: meter.latitude,
-        longitude: meter.longitude,
+    // Process in batches
+    await processBatch(
+      items,
+      BATCH_SIZE,
+      async (batchItems) => {
+        await prisma.$transaction(async (tx) => {
+          // Create devices
+          await tx.device.createMany({
+            data: batchItems.map(item => ({
+              serialNumber: item.deviceSerial,
+              tenantId,
+              deviceProfileId,
+              status: DeviceStatus.ACTIVE,
+              dynamicFields: item.dynamicFields,
+            })),
+          });
+
+          // Get created devices
+          const devices = await tx.device.findMany({
+            where: { serialNumber: { in: batchItems.map(i => i.deviceSerial) } },
+            select: { id: true, serialNumber: true },
+          });
+          const deviceMap = new Map(devices.map(d => [d.serialNumber, d.id]));
+
+          // Create customers
+          await tx.customer.createMany({
+            data: batchItems.map(item => ({
+              tenantId,
+              customerType: CustomerType.INDIVIDUAL,
+              consumptionType: ConsumptionType.NORMAL,
+              details: { firstName: item.customerName, lastName: 'Auto', tcIdNo: randomHex(11) },
+              address: { city: isHatsu ? 'Hatay' : 'Ankara', district: 'Merkez' },
+              latitude: item.coords.lat,
+              longitude: item.coords.lng,
+            })),
+          });
+
+          // Get created customers (match by name pattern)
+          const customers = await tx.customer.findMany({
+            where: { tenantId },
+            orderBy: { createdAt: 'desc' },
+            take: batchItems.length,
+            select: { id: true },
+          });
+
+          // Create meters
+          const metersData = batchItems.map((item, idx) => ({
+            serialNumber: item.meterSerial,
+            tenantId,
+            customerId: customers[idx]?.id || customers[0].id,
+            meterProfileId,
+            activeDeviceId: deviceMap.get(item.deviceSerial),
+            initialIndex: Math.random() * 1000,
+            installationDate: new Date(Date.now() - Math.random() * 45 * 24 * 60 * 60 * 1000), // Within last 45 days
+            status: MeterStatus.ACTIVE,
+            address: { city: isHatsu ? 'Hatay' : 'Ankara', district: 'Merkez' },
+            latitude: item.coords.lat,
+            longitude: item.coords.lng,
+          }));
+
+          await tx.meter.createMany({ data: metersData });
+        }, { timeout: 60000 });
       },
-    });
-    createdMeters.push({ id: created.id, serialNumber: created.serialNumber });
-    const customerName = createdCustomers.find(c => c.id === meter.customerId)?.name || 'Unknown';
-    console.log(`   ✓ ${meter.serialNumber} -> Customer: ${customerName}`);
+      batch.serialPrefix
+    );
   }
 
-  // ---------------------------------------------------------------------------
-  // 12. Link First Device to First Meter (Demo: Device-Meter Linking)
-  // ---------------------------------------------------------------------------
-  console.log('\n🔗 Linking Demo Device to Meter...');
+  console.log(`\n   ✓ Total Devices: ${globalDeviceCounter}`);
+  console.log(`   ✓ Total Meters: ${globalMeterCounter}`);
+  console.log(`   ✓ Total Customers: ${globalCustomerCounter}`);
+}
 
-  // Get the first warehouse device (UNA LoRaWAN) and first meter
-  const firstDevice = await prisma.device.findFirst({
-    where: { serialNumber: 'UNA-LW-001' },
+// -----------------------------------------------------------------------------
+// B.7: Create Golden Record (Kemalettin ŞAHİN)
+// With exact coordinates from Seed 2
+// -----------------------------------------------------------------------------
+async function createGoldenRecord(
+  tenants: Record<string, string>,
+  meterProfiles: string[],
+  deviceProfiles: string[]
+) {
+  console.log('\n⭐ Creating Golden Record (Kemalettin ŞAHİN)...');
+
+  const askiId = tenants['root.aski'];
+
+  // Exact coordinates from Seed 2
+  const meter1Coords = { lat: 39.99451679511336, lng: 32.86308219026244 };
+  const meter2Coords = { lat: 39.89441311052211, lng: 32.81460781844764 };
+
+  // Create the special customer
+  const customer = await prisma.customer.create({
+    data: {
+      tenantId: askiId,
+      customerType: CustomerType.INDIVIDUAL,
+      consumptionType: ConsumptionType.NORMAL,
+      details: {
+        firstName: 'Kemalettin',
+        lastName: 'ŞAHİN',
+        tcIdNo: '12345678901',
+        phone: '+905551234567',
+        email: 'kemalettin.sahin@example.com',
+      },
+      address: {
+        city: 'Ankara',
+        district: 'Keçiören',
+        neighborhood: 'Tepebaşı Mahallesi',
+        street: 'Foça Sokak',
+        buildingNo: '100',
+        floor: '2',
+        postalCode: '06390',
+      },
+      latitude: meter1Coords.lat,
+      longitude: meter1Coords.lng,
+    },
   });
-  const firstMeter = createdMeters[0];
 
-  if (firstDevice && firstMeter) {
-    await prisma.meter.update({
-      where: { id: firstMeter.id },
-      data: { activeDeviceId: firstDevice.id },
-    });
-    await prisma.device.update({
-      where: { id: firstDevice.id },
-      data: { status: DeviceStatus.ACTIVE },
-    });
-    console.log(`   ✓ Linked ${firstDevice.serialNumber} -> ${firstMeter.serialNumber}`);
-  }
+  console.log(`   ✓ Customer: Kemalettin ŞAHİN (${customer.id})`);
 
-  // ---------------------------------------------------------------------------
-  // 13. Create Global Settings
-  // ---------------------------------------------------------------------------
-  console.log('\n⚙️  Creating Global Settings...');
+  // Create dedicated devices for golden record meters
+  const goldenDevices = await Promise.all([
+    prisma.device.create({
+      data: {
+        serialNumber: 'GOLDEN-DEV-001',
+        tenantId: askiId,
+        deviceProfileId: deviceProfiles[1], // Itron device
+        status: DeviceStatus.ACTIVE,
+        dynamicFields: { IMEI: '999999999990001', IMSI: '999999999990001' },
+      },
+    }),
+    prisma.device.create({
+      data: {
+        serialNumber: 'GOLDEN-DEV-002',
+        tenantId: askiId,
+        deviceProfileId: deviceProfiles[1], // Itron device
+        status: DeviceStatus.ACTIVE,
+        dynamicFields: { IMEI: '999999999990002', IMSI: '999999999990002' },
+      },
+    }),
+  ]);
 
-  const globalSettings = [
+  console.log(`   ✓ Created 2 dedicated devices for golden record`);
+
+  // Meter addresses per Seed 2
+  const meterAddresses = [
     {
-      key: 'platform.name',
-      value: { name: 'Read Water', displayName: 'Read Water Platform' },
-      category: 'branding',
+      address: {
+        city: 'Ankara',
+        district: 'Keçiören',
+        neighborhood: 'Tepebaşı Mahallesi',
+        street: 'Foça Sokak',
+        buildingNo: '100',
+        floor: '2',
+        postalCode: '06390',
+      },
+      lat: meter1Coords.lat,
+      lng: meter1Coords.lng,
     },
     {
-      key: 'platform.title',
-      value: { title: 'Remote Water Meter Reading Platform' },
-      category: 'branding',
-    },
-    {
-      key: 'platform.description',
-      value: { description: 'High-performance, multi-tenant water meter reading platform' },
-      category: 'branding',
-    },
-    {
-      key: 'platform.supportedLanguages',
-      value: { languages: ['en', 'tr', 'fr'] },
-      category: 'i18n',
-    },
-    {
-      key: 'platform.defaultLanguage',
-      value: { language: 'en' },
-      category: 'i18n',
-    },
-    {
-      key: 'readings.pageSize',
-      value: { pageSize: 30 },
-      category: 'pagination',
+      address: {
+        city: 'Ankara',
+        district: 'Çankaya',
+        neighborhood: 'Ehlibeyt Mahallesi',
+        street: 'Tekstilciler Caddesi',
+        buildingNo: '16',
+        floor: '4',
+        postalCode: '06520',
+      },
+      lat: meter2Coords.lat,
+      lng: meter2Coords.lng,
     },
   ];
 
-  for (const setting of globalSettings) {
-    await prisma.setting.upsert({
-      where: {
-        tenantId_key: {
-          tenantId: rootTenant.id,
-          key: setting.key,
-        },
-      },
-      update: { value: setting.value },
-      create: {
-        tenantId: rootTenant.id,
-        key: setting.key,
-        value: setting.value,
-        category: setting.category,
+  for (let i = 0; i < 2; i++) {
+    const meter = await prisma.meter.create({
+      data: {
+        serialNumber: `GOLDEN-MTR-${i + 1}`,
+        tenantId: askiId,
+        customerId: customer.id,
+        meterProfileId: meterProfiles[2], // Itron_A
+        activeDeviceId: goldenDevices[i].id,
+        initialIndex: 0,
+        installationDate: new Date('2024-10-01'),
+        status: MeterStatus.ACTIVE,
+        address: meterAddresses[i].address,
+        latitude: meterAddresses[i].lat,
+        longitude: meterAddresses[i].lng,
       },
     });
-    console.log(`   ✓ ${setting.key}`);
+    console.log(`   ✓ Meter ${i + 1}: ${meter.serialNumber} @ ${meterAddresses[i].address.neighborhood}`);
   }
+}
 
-  // ---------------------------------------------------------------------------
+// =============================================================================
+// PART C: HISTORICAL READINGS (SQL Generation)
+// SEED 2: 24 readings/day × 45 days with realistic values
+// =============================================================================
+async function generateHistoricalReadings() {
+  console.log('\n📈 PART C: Generating Historical Readings (45 days, 24 readings/day)...');
+  console.log('   ⏳ This may take a minute...\n');
+
+  const startTime = Date.now();
+
+  // Generate readings using pure SQL for maximum performance
+  // 24 readings/day = 1 reading per hour
+  // Includes: realistic consumption patterns, signal strength, battery, temperature
+  await prisma.$executeRaw`
+    INSERT INTO "readings" (
+      "id", 
+      "time", 
+      "tenant_id", 
+      "meter_id", 
+      "value", 
+      "consumption", 
+      "unit", 
+      "signal_strength", 
+      "battery_level", 
+      "temperature",
+      "source",
+      "source_device_id",
+      "communication_technology",
+      "processed_at"
+    )
+    SELECT
+      gen_random_uuid() as id,
+      time_series.ts as time,
+      m.tenant_id as tenant_id,
+      m.id as meter_id,
+      
+      -- CUMULATIVE VALUE: Initial Index + accumulated consumption
+      -- Uses a window function approach via subquery for cumulative sum
+      m.initial_index + (
+        -- Calculate hours since start
+        (EXTRACT(EPOCH FROM (time_series.ts - (NOW() - interval '45 days'))) / 3600)
+        -- Base hourly rate with time-of-day variation
+        * (
+          CASE 
+            -- Night hours (00:00 - 06:00): Very low usage
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 0 AND 5 THEN 0.005
+            -- Early morning (06:00 - 08:00): Rising usage (showers, breakfast)
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 6 AND 7 THEN 0.08
+            -- Morning peak (08:00 - 10:00): High usage
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 8 AND 9 THEN 0.12
+            -- Mid-day (10:00 - 17:00): Moderate usage
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 10 AND 16 THEN 0.04
+            -- Evening peak (17:00 - 21:00): High usage (cooking, cleaning, showers)
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 17 AND 20 THEN 0.10
+            -- Late evening (21:00 - 23:59): Declining usage
+            ELSE 0.02
+          END
+        )
+        -- Weekend factor (slightly higher on weekends)
+        * (CASE WHEN EXTRACT(DOW FROM time_series.ts) IN (0, 6) THEN 1.15 ELSE 1.0 END)
+        -- Add some randomness (±20%)
+        * (0.8 + random() * 0.4)
+      ) as value,
+      
+      -- HOURLY CONSUMPTION: Water used in this hour
+      (
+        CASE 
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 0 AND 5 THEN 0.005
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 6 AND 7 THEN 0.08
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 8 AND 9 THEN 0.12
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 10 AND 16 THEN 0.04
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 17 AND 20 THEN 0.10
+          ELSE 0.02
+        END
+      ) 
+      * (CASE WHEN EXTRACT(DOW FROM time_series.ts) IN (0, 6) THEN 1.15 ELSE 1.0 END)
+      * (0.8 + random() * 0.4) as consumption,
+      
+      'm3' as unit,
+      
+      -- SIGNAL STRENGTH: -60 to -110 dBm (varies with some randomness)
+      -- Better signal during day, slightly worse at night
+      (
+        -70 
+        - (random() * 30)::int  -- Random variation -70 to -100
+        - (CASE WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 2 AND 5 THEN 5 ELSE 0 END)  -- Slightly worse at night
+      )::int as signal_strength,
+      
+      -- BATTERY LEVEL: Starts at 100%, slowly decreases over 45 days
+      -- Decreases roughly 0.5% per day, with small random variations
+      GREATEST(
+        85,
+        100 - (
+          (EXTRACT(EPOCH FROM (time_series.ts - (NOW() - interval '45 days'))) / 86400) * 0.3
+        )::int - (random() * 2)::int
+      )::int as battery_level,
+      
+      -- TEMPERATURE: Ambient temperature (10-25°C typical, varies by time of day)
+      (
+        15.0  -- Base temp
+        + (CASE 
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 12 AND 16 THEN 8  -- Warmer midday
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 6 AND 11 THEN 4   -- Morning warmup
+            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 17 AND 20 THEN 5  -- Evening cooldown
+            ELSE 0  -- Night (coolest)
+          END)
+        + (random() * 4 - 2)  -- Random variation ±2°C
+      )::decimal(5,2) as temperature,
+      
+      'LORAWAN' as source,
+      
+      -- Link to the meter's active device
+      m.active_device_id as source_device_id,
+      
+      -- Communication technology
+      'LORAWAN'::"CommunicationTechnology" as communication_technology,
+      
+      -- Processed timestamp (slightly after reading time)
+      time_series.ts + interval '1 second' * (random() * 5) as processed_at
+      
+    FROM "meters" m
+    CROSS JOIN generate_series(
+      NOW() - interval '45 days',
+      NOW(),
+      interval '1 hour'
+    ) as time_series(ts)
+    WHERE m.status = 'ACTIVE'
+  `;
+
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  
+  // Get count
+  const countResult = await prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM readings`;
+  const readingsCount = Number(countResult[0].count);
+
+  console.log(`   ✓ Generated ${readingsCount.toLocaleString()} readings in ${duration}s`);
+
+  // Update meters with their last reading values
+  console.log('   📊 Updating meters with last reading values...');
+  
+  await prisma.$executeRaw`
+    UPDATE "meters" m
+    SET 
+      last_reading_value = r.value,
+      last_reading_time = r.time
+    FROM (
+      SELECT DISTINCT ON (meter_id) 
+        meter_id, 
+        value, 
+        time
+      FROM "readings"
+      ORDER BY meter_id, time DESC
+    ) r
+    WHERE m.id = r.meter_id
+  `;
+
+  console.log('   ✓ Updated meter last reading values');
+
+  // Update devices with their last communication data from readings
+  // Every reading = device communication, so devices should reflect the last reading's metrics
+  console.log('   📡 Updating devices with last communication data...');
+  
+  await prisma.$executeRaw`
+    UPDATE "devices" d
+    SET 
+      last_signal_strength = r.signal_strength,
+      last_battery_level = r.battery_level,
+      last_communication_at = r.time
+    FROM (
+      SELECT DISTINCT ON (source_device_id) 
+        source_device_id,
+        signal_strength,
+        battery_level,
+        time
+      FROM "readings"
+      WHERE source_device_id IS NOT NULL
+      ORDER BY source_device_id, time DESC
+    ) r
+    WHERE d.id = r.source_device_id
+  `;
+
+  console.log('   ✓ Updated device communication data');
+}
+
+// =============================================================================
+// MAIN SEED FUNCTION
+// =============================================================================
+async function main() {
+  console.log('='.repeat(80));
+  console.log('🌱 READ WATER - SEED 2 (Development/Demo Environment)');
+  console.log('='.repeat(80));
+
+  const startTime = Date.now();
+
+  // PART A: Teardown
+  await teardown();
+
+  // PART B: Data Creation
+  console.log('📊 PART B: DATA CREATION\n');
+
+  // B.1: Tenants
+  const tenants = await createTenants();
+
+  // B.2: Users
+  await createUsers(tenants);
+
+  // B.3: Communication Tech Definitions
+  await createCommunicationTechDefs();
+
+  // B.4: Meter Profiles
+  const meterProfiles = await createMeterProfiles(tenants);
+
+  // B.5: Device Profiles
+  const deviceProfiles = await createDeviceProfiles(meterProfiles);
+
+  // B.6: Bulk Assets
+  await createBulkAssets(tenants, meterProfiles, deviceProfiles);
+
+  // B.7: Golden Record
+  await createGoldenRecord(tenants, meterProfiles, deviceProfiles);
+
+  // PART C: Historical Readings
+  await generateHistoricalReadings();
+
   // Summary
-  // ---------------------------------------------------------------------------
-  console.log('\n' + '='.repeat(70));
-  console.log('🎉 Database seed completed successfully!\n');
-  console.log('Summary:');
-  console.log(`   • Communication Tech Definitions: ${communicationTechFieldDefs.length}`);
-  console.log(`   • Root Tenant: ${rootTenant.name}`);
-  console.log(`   • Platform Admin: ${adminUser.email}`);
-  console.log(`   • Default Password: Admin@123 (CHANGE IN PRODUCTION!)`);
-  console.log(`   • Device Profiles: ${deviceProfiles.length}`);
-  console.log(`   • Meter Profiles: ${meterProfiles.length}`);
-  console.log(`   • Warehouse Devices: ${warehouseDevices.length}`);
-  console.log(`   • Sample Customers: ${createdCustomers.length}`);
-  console.log(`   • Sample Meters: ${createdMeters.length}`);
-  console.log(`   • Global Settings: ${globalSettings.length}`);
-  console.log('='.repeat(70) + '\n');
+  const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  console.log('\n' + '='.repeat(80));
+  console.log('🎉 SEED 2 COMPLETED SUCCESSFULLY!');
+  console.log('='.repeat(80));
+  console.log(`\n⏱️  Total Duration: ${totalDuration}s\n`);
+  console.log('📊 Summary:');
+  console.log('   • Tenants: 3 (Root, ASKİ, HATSU)');
+  console.log('   • Users: 3 (super.admin, aski.yetkili, hatsu.yetkili)');
+  console.log('   • Password: Asdf1234.');
+  console.log('   • Meter Profiles: 10');
+  console.log('   • Device Profiles: 7');
+  console.log('   • HATSU Assets: 400 meters (4 batches × 100)');
+  console.log('   • ASKİ Assets: 1,300 meters (13 batches × 100)');
+  console.log('   • Golden Record: Kemalettin ŞAHİN (2 meters)');
+  console.log('   • Total Meters: 1,702');
+  console.log('   • Readings: ~1.8M (45 days × 24/day × 1,702 meters)');
+  console.log('');
+  console.log('📈 Reading Fields Populated:');
+  console.log('   • value: Cumulative meter index (m³)');
+  console.log('   • consumption: Hourly consumption with day/night patterns');
+  console.log('   • signal_strength: -60 to -110 dBm');
+  console.log('   • battery_level: 85-100% (slowly decreasing)');
+  console.log('   • temperature: 10-25°C (time-of-day variation)');
+  console.log('   • source_device_id: Linked to active device');
+  console.log('');
+  console.log('🔄 Data Consistency:');
+  console.log('   • Meters updated with last_reading_value/time');
+  console.log('   • Devices updated with last_signal_strength/battery/communication_at');
+  console.log('\n' + '='.repeat(80) + '\n');
 }
 
 // =============================================================================

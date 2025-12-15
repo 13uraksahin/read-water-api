@@ -9,6 +9,7 @@ export declare class MetersService {
     private readonly logger;
     constructor(prisma: PrismaService, kysely: KyselyService);
     create(dto: CreateMeterDto, user: AuthenticatedUser): Promise<Meter>;
+    private getEffectiveTenantPath;
     findAll(query: MeterQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Meter>>;
     findOne(id: string, user: AuthenticatedUser): Promise<Meter>;
     update(id: string, dto: UpdateMeterDto, user: AuthenticatedUser): Promise<Meter>;

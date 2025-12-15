@@ -95,20 +95,39 @@ let MetersService = MetersService_1 = class MetersService {
         this.logger.log(`Created meter: ${meter.serialNumber}`);
         return meter;
     }
+    async getEffectiveTenantPath(user, tenantId) {
+        if (tenantId) {
+            const selectedTenant = await this.prisma.tenant.findUnique({
+                where: { id: tenantId },
+                select: { path: true },
+            });
+            if (!selectedTenant) {
+                return user.tenantPath;
+            }
+            if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+                if (!selectedTenant.path.startsWith(user.tenantPath)) {
+                    return user.tenantPath;
+                }
+            }
+            return selectedTenant.path;
+        }
+        if (user.role === constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            return null;
+        }
+        return user.tenantPath;
+    }
     async findAll(query, user) {
         const page = query.page || constants_1.PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || constants_1.PAGINATION.DEFAULT_LIMIT, constants_1.PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
         const whereClause = {};
-        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+        const effectivePath = await this.getEffectiveTenantPath(user, query.tenantId);
+        if (effectivePath) {
             whereClause.tenant = {
                 path: {
-                    startsWith: user.tenantPath,
+                    startsWith: effectivePath,
                 },
             };
-        }
-        if (query.tenantId) {
-            whereClause.tenantId = query.tenantId;
         }
         if (query.customerId) {
             whereClause.customerId = query.customerId;

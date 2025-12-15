@@ -121,20 +121,39 @@ let DevicesService = DevicesService_1 = class DevicesService {
         this.logger.log(`Bulk created ${created} devices, ${errors.length} errors`);
         return { created, errors };
     }
+    async getEffectiveTenantPath(user, tenantId) {
+        if (tenantId) {
+            const selectedTenant = await this.prisma.tenant.findUnique({
+                where: { id: tenantId },
+                select: { path: true },
+            });
+            if (!selectedTenant) {
+                return user.tenantPath;
+            }
+            if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+                if (!selectedTenant.path.startsWith(user.tenantPath)) {
+                    return user.tenantPath;
+                }
+            }
+            return selectedTenant.path;
+        }
+        if (user.role === constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+            return null;
+        }
+        return user.tenantPath;
+    }
     async findAll(query, user) {
         const page = query.page || constants_1.PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || constants_1.PAGINATION.DEFAULT_LIMIT, constants_1.PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
         const whereClause = {};
-        if (user.role !== constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
+        const effectivePath = await this.getEffectiveTenantPath(user, query.tenantId);
+        if (effectivePath) {
             whereClause.tenant = {
                 path: {
-                    startsWith: user.tenantPath,
+                    startsWith: effectivePath,
                 },
             };
-        }
-        if (query.tenantId) {
-            whereClause.tenantId = query.tenantId;
         }
         if (query.deviceProfileId) {
             whereClause.deviceProfileId = query.deviceProfileId;
@@ -245,6 +264,19 @@ let DevicesService = DevicesService_1 = class DevicesService {
                     select: { id: true, name: true, path: true },
                 },
                 deviceProfile: true,
+                meter: {
+                    select: {
+                        id: true,
+                        serialNumber: true,
+                        status: true,
+                        customer: {
+                            select: { id: true, details: true },
+                        },
+                        meterProfile: {
+                            select: { brand: true, modelCode: true },
+                        },
+                    },
+                },
             },
         });
         if (!device) {
@@ -255,18 +287,7 @@ let DevicesService = DevicesService_1 = class DevicesService {
                 throw new common_1.ForbiddenException('You do not have access to this device');
             }
         }
-        const linkedMeter = await this.prisma.meter.findFirst({
-            where: { activeDeviceId: id },
-            include: {
-                customer: {
-                    select: { id: true, details: true },
-                },
-                meterProfile: {
-                    select: { brand: true, modelCode: true },
-                },
-            },
-        });
-        return { ...device, linkedMeter };
+        return device;
     }
     async findByDynamicField(fieldName, fieldValue) {
         const devices = await this.prisma.$queryRaw `
@@ -286,7 +307,7 @@ let DevicesService = DevicesService_1 = class DevicesService {
             });
             await this.validateDynamicFields(dto.dynamicFields, deviceProfile);
         }
-        if (dto.status && device.linkedMeter) {
+        if (dto.status && device.meter) {
             if (dto.status === client_1.DeviceStatus.WAREHOUSE) {
                 throw new common_1.BadRequestException('Cannot set status to WAREHOUSE while device is linked to a meter. Unlink first.');
             }
@@ -324,7 +345,7 @@ let DevicesService = DevicesService_1 = class DevicesService {
     }
     async delete(id, user) {
         const device = await this.findOne(id, user);
-        if (device.linkedMeter) {
+        if (device.meter) {
             throw new common_1.BadRequestException('Cannot delete device while it is linked to a meter. Unlink first.');
         }
         await this.prisma.device.delete({

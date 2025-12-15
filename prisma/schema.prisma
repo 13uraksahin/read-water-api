@@ -77,6 +77,9 @@ enum Brand {
   TURKOGLU
   BEREKET
   TEKSAN
+  ITRON
+  IMA
+  CODIGNO
 }
 
 // 13. Device Brands
@@ -85,6 +88,11 @@ enum DeviceBrand {
   IMA
   ITRON
   ZENNER
+  MANAS
+  BAYLAN
+  CEM
+  KLEPSAN
+  CODIGNO
 }
 
 // 6.8 Communication Technologies

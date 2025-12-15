@@ -16,29 +16,33 @@ exports.ReadingsController = void 0;
 const common_1 = require("@nestjs/common");
 const readings_service_1 = require("./readings.service");
 const jwt_auth_guard_1 = require("../iam/auth/guards/jwt-auth.guard");
+const decorators_1 = require("../../common/decorators");
 let ReadingsController = class ReadingsController {
     readingsService;
     constructor(readingsService) {
         this.readingsService = readingsService;
     }
-    async getReadings(page, limit, meterId, tenantId) {
+    async getReadings(user, page, limit, meterId, tenantId, sourceDeviceId) {
         return this.readingsService.getReadings({
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             meterId,
             tenantId,
-        });
+            sourceDeviceId,
+        }, user);
     }
 };
 exports.ReadingsController = ReadingsController;
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Query)('page')),
-    __param(1, (0, common_1.Query)('limit')),
-    __param(2, (0, common_1.Query)('meterId')),
-    __param(3, (0, common_1.Query)('tenantId')),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
+    __param(3, (0, common_1.Query)('meterId')),
+    __param(4, (0, common_1.Query)('tenantId')),
+    __param(5, (0, common_1.Query)('sourceDeviceId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:paramtypes", [Object, String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], ReadingsController.prototype, "getReadings", null);
 exports.ReadingsController = ReadingsController = __decorate([

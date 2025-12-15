@@ -10,14 +10,19 @@ export declare class AuthController {
     logout(user: AuthenticatedUser, refreshToken?: string): Promise<void>;
     changePassword(user: AuthenticatedUser, dto: ChangePasswordDto): Promise<void>;
     me(user: AuthenticatedUser): Promise<{
-        id: any;
-        email: any;
-        firstName: any;
-        lastName: any;
-        phone: any;
-        isActive: any;
-        createdAt: any;
-        lastLoginAt: any;
-        tenants: any;
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        phone: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        lastLoginAt: Date | null;
+        tenants: {
+            tenantId: string;
+            tenantName: string;
+            tenantPath: string;
+            role: import("@prisma/client").$Enums.SystemRole;
+        }[];
     }>;
 }

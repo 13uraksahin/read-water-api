@@ -8,7 +8,6 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MeterProfileQueryDto = exports.UpdateMeterProfileDto = exports.CreateMeterProfileDto = void 0;
 const class_validator_1 = require("class-validator");
@@ -41,7 +40,7 @@ exports.CreateMeterProfileDto = CreateMeterProfileDto;
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.Brand),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", typeof (_a = typeof client_1.Brand !== "undefined" && client_1.Brand) === "function" ? _a : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "brand", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
@@ -51,27 +50,27 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.MeterType),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", typeof (_b = typeof client_1.MeterType !== "undefined" && client_1.MeterType) === "function" ? _b : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "meterType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DialType),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", typeof (_c = typeof client_1.DialType !== "undefined" && client_1.DialType) === "function" ? _c : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "dialType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.ConnectionType),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", typeof (_d = typeof client_1.ConnectionType !== "undefined" && client_1.ConnectionType) === "function" ? _d : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "connectionType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.MountingType),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", typeof (_e = typeof client_1.MountingType !== "undefined" && client_1.MountingType) === "function" ? _e : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "mountingType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.TemperatureType),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", typeof (_f = typeof client_1.TemperatureType !== "undefined" && client_1.TemperatureType) === "function" ? _f : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "temperatureType", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
@@ -136,12 +135,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.IPRating),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_g = typeof client_1.IPRating !== "undefined" && client_1.IPRating) === "function" ? _g : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "ipRating", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.CommunicationModule),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_h = typeof client_1.CommunicationModule !== "undefined" && client_1.CommunicationModule) === "function" ? _h : Object)
+    __metadata("design:type", String)
 ], CreateMeterProfileDto.prototype, "communicationModule", void 0);
 __decorate([
     (0, class_validator_1.IsArray)(),
@@ -185,27 +184,27 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.MeterType),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_j = typeof client_1.MeterType !== "undefined" && client_1.MeterType) === "function" ? _j : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "meterType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.DialType),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_k = typeof client_1.DialType !== "undefined" && client_1.DialType) === "function" ? _k : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "dialType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.ConnectionType),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_l = typeof client_1.ConnectionType !== "undefined" && client_1.ConnectionType) === "function" ? _l : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "connectionType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.MountingType),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_m = typeof client_1.MountingType !== "undefined" && client_1.MountingType) === "function" ? _m : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "mountingType", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.TemperatureType),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_o = typeof client_1.TemperatureType !== "undefined" && client_1.TemperatureType) === "function" ? _o : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "temperatureType", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
@@ -270,12 +269,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.IPRating),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_p = typeof client_1.IPRating !== "undefined" && client_1.IPRating) === "function" ? _p : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "ipRating", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.CommunicationModule),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_q = typeof client_1.CommunicationModule !== "undefined" && client_1.CommunicationModule) === "function" ? _q : Object)
+    __metadata("design:type", String)
 ], UpdateMeterProfileDto.prototype, "communicationModule", void 0);
 __decorate([
     (0, class_validator_1.IsArray)(),
@@ -313,12 +312,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.Brand),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_r = typeof client_1.Brand !== "undefined" && client_1.Brand) === "function" ? _r : Object)
+    __metadata("design:type", String)
 ], MeterProfileQueryDto.prototype, "brand", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.MeterType),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", typeof (_s = typeof client_1.MeterType !== "undefined" && client_1.MeterType) === "function" ? _s : Object)
+    __metadata("design:type", String)
 ], MeterProfileQueryDto.prototype, "meterType", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
