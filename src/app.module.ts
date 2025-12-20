@@ -21,6 +21,7 @@ import { ReadingsModule } from './modules/readings/readings.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AlarmsModule } from './modules/alarms/alarms.module';
+import { HealthModule } from './modules/health/health.module';
 // Note: DecodersModule removed - decoder logic merged into DeviceProfilesModule
 
 // Guards
@@ -58,6 +59,9 @@ import { JwtAuthGuard } from './modules/iam/auth/guards/jwt-auth.guard';
         },
       }),
     }),
+
+    // Health checks (public, no auth)
+    HealthModule,
 
     // Feature modules
     IamModule,

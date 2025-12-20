@@ -22,6 +22,7 @@ const readings_module_1 = require("./modules/readings/readings.module");
 const customers_module_1 = require("./modules/customers/customers.module");
 const settings_module_1 = require("./modules/settings/settings.module");
 const alarms_module_1 = require("./modules/alarms/alarms.module");
+const health_module_1 = require("./modules/health/health.module");
 const jwt_auth_guard_1 = require("./modules/iam/auth/guards/jwt-auth.guard");
 let AppModule = class AppModule {
 };
@@ -56,6 +57,7 @@ exports.AppModule = AppModule = __decorate([
                     },
                 }),
             }),
+            health_module_1.HealthModule,
             iam_module_1.IamModule,
             device_module_1.DeviceModule,
             ingestion_module_1.IngestionModule,
