@@ -17,7 +17,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { SubscriptionStatus } from '@prisma/client';
+import { TenantSubscriptionStatus } from '@prisma/client';
 
 class AddressDto {
   @IsString()
@@ -103,9 +103,9 @@ export class CreateTenantDto {
   @IsOptional()
   longitude?: number;
 
-  @IsEnum(SubscriptionStatus)
+  @IsEnum(TenantSubscriptionStatus)
   @IsOptional()
-  subscriptionStatus?: SubscriptionStatus;
+  tenantSubscriptionStatus?: TenantSubscriptionStatus;
 
   @IsString()
   @IsOptional()
@@ -118,6 +118,10 @@ export class CreateTenantDto {
   @IsUUID('4', { each: true })
   @IsOptional()
   allowedProfileIds?: string[];
+
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  allowedDeviceProfileIds?: string[];
 }
 
 export class UpdateTenantDto {
@@ -162,9 +166,9 @@ export class UpdateTenantDto {
   @IsOptional()
   longitude?: number;
 
-  @IsEnum(SubscriptionStatus)
+  @IsEnum(TenantSubscriptionStatus)
   @IsOptional()
-  subscriptionStatus?: SubscriptionStatus;
+  tenantSubscriptionStatus?: TenantSubscriptionStatus;
 
   @IsString()
   @IsOptional()
@@ -177,6 +181,10 @@ export class UpdateTenantDto {
   @IsUUID('4', { each: true })
   @IsOptional()
   allowedProfileIds?: string[];
+
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  allowedDeviceProfileIds?: string[];
 }
 
 export class TenantQueryDto {
@@ -197,9 +205,9 @@ export class TenantQueryDto {
   @IsOptional()
   search?: string;
 
-  @IsEnum(SubscriptionStatus)
+  @IsEnum(TenantSubscriptionStatus)
   @IsOptional()
-  subscriptionStatus?: SubscriptionStatus;
+  tenantSubscriptionStatus?: TenantSubscriptionStatus;
 
   @IsUUID()
   @IsOptional()

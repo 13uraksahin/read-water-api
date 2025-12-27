@@ -15,7 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { RedisService } from '../../../core/redis/redis.service';
 import { JwtPayload } from '../../../common/interfaces';
-import { CACHE_KEYS, CACHE_TTL, ROLE_PERMISSIONS, SYSTEM_ROLES } from '../../../common/constants';
+import { CACHE_KEYS, CACHE_TTL, ROLE_PERMISSIONS, SYSTEM_ROLES, getPermissionsForRole } from '../../../common/constants';
 import {
   LoginDto,
   RegisterDto,
@@ -39,15 +39,20 @@ export class AuthService {
    * Login user and return tokens
    */
   async login(dto: LoginDto): Promise<AuthResponseDto> {
-    // Find user by email
+    // Find user by email with ALL tenant assignments
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
       include: {
         tenants: {
           include: {
-            tenant: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                path: true,
+              },
+            },
           },
-          take: 1, // Get first tenant (default)
         },
       },
     });
@@ -66,10 +71,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const userTenant = user.tenants[0];
-    if (!userTenant) {
+    if (!user.tenants.length) {
       throw new UnauthorizedException('User has no tenant assignment');
     }
+
+    // Get primary tenant (first one or highest priority role)
+    const userTenant = this.getPrimaryTenant(user.tenants);
+
+    // Resolve permissions for primary tenant
+    const primaryPermissions = this.resolvePermissions(userTenant.role, userTenant.permissions);
+
+    // Build tenant assignments with resolved permissions
+    const tenantAssignments = user.tenants.map((ut) => ({
+      tenantId: ut.tenantId,
+      tenantName: ut.tenant.name,
+      tenantPath: ut.tenant.path,
+      role: ut.role,
+      permissions: this.resolvePermissions(ut.role, ut.permissions),
+    }));
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email, userTenant.tenantId);
@@ -101,6 +120,8 @@ export class AuthService {
         lastName: user.lastName,
         tenantId: userTenant.tenantId,
         role: userTenant.role,
+        permissions: primaryPermissions,
+        tenants: tenantAssignments,
       },
     };
   }
@@ -148,13 +169,31 @@ export class AuthService {
       include: {
         tenants: {
           include: {
-            tenant: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                path: true,
+              },
+            },
           },
         },
       },
     });
 
     const userTenant = user.tenants[0];
+
+    // Resolve permissions
+    const permissions = this.resolvePermissions(userTenant.role, userTenant.permissions);
+
+    // Build tenant assignments
+    const tenantAssignments = user.tenants.map((ut) => ({
+      tenantId: ut.tenantId,
+      tenantName: ut.tenant.name,
+      tenantPath: ut.tenant.path,
+      role: ut.role,
+      permissions: this.resolvePermissions(ut.role, ut.permissions),
+    }));
 
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email, userTenant.tenantId);
@@ -168,6 +207,8 @@ export class AuthService {
         lastName: user.lastName,
         tenantId: userTenant.tenantId,
         role: userTenant.role,
+        permissions,
+        tenants: tenantAssignments,
       },
     };
   }
@@ -185,15 +226,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    // Get user
+    // Get user with all tenant assignments
     const user = await this.prisma.user.findUnique({
       where: { id: storedToken.userId },
       include: {
         tenants: {
           include: {
-            tenant: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                path: true,
+              },
+            },
           },
-          take: 1,
         },
       },
     });
@@ -202,7 +248,24 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    const userTenant = user.tenants[0];
+    if (!user.tenants.length) {
+      throw new UnauthorizedException('User has no tenant assignment');
+    }
+
+    // Get primary tenant
+    const userTenant = this.getPrimaryTenant(user.tenants);
+
+    // Resolve permissions
+    const permissions = this.resolvePermissions(userTenant.role, userTenant.permissions);
+
+    // Build tenant assignments
+    const tenantAssignments = user.tenants.map((ut) => ({
+      tenantId: ut.tenantId,
+      tenantName: ut.tenant.name,
+      tenantPath: ut.tenant.path,
+      role: ut.role,
+      permissions: this.resolvePermissions(ut.role, ut.permissions),
+    }));
 
     // Revoke old refresh token
     await this.prisma.refreshToken.update({
@@ -222,6 +285,8 @@ export class AuthService {
         lastName: user.lastName,
         tenantId: userTenant.tenantId,
         role: userTenant.role,
+        permissions,
+        tenants: tenantAssignments,
       },
     };
   }
@@ -394,6 +459,37 @@ export class AuthService {
       default:
         return 3600;
     }
+  }
+
+  /**
+   * Resolve effective permissions for a user (role-based + custom)
+   */
+  private resolvePermissions(role: string, customPermissions: string[] = []): string[] {
+    // Get role-based permissions
+    const rolePermissions = getPermissionsForRole(role);
+    
+    // Combine with custom permissions and return unique values
+    return [...new Set([...rolePermissions, ...customPermissions])];
+  }
+
+  /**
+   * Get primary tenant (highest role priority)
+   */
+  private getPrimaryTenant(tenants: any[]): any {
+    const rolePriority = [
+      SYSTEM_ROLES.PLATFORM_ADMIN,
+      SYSTEM_ROLES.TENANT_ADMIN,
+      SYSTEM_ROLES.OPERATOR,
+      SYSTEM_ROLES.FIELD_ENGINEER,
+      SYSTEM_ROLES.VIEWER,
+      SYSTEM_ROLES.CUSTOMER,
+    ];
+
+    return tenants.reduce((best, current) => {
+      const bestIndex = rolePriority.indexOf(best.role);
+      const currentIndex = rolePriority.indexOf(current.role);
+      return currentIndex < bestIndex ? current : best;
+    }, tenants[0]);
   }
 }
 

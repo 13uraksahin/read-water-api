@@ -59,6 +59,14 @@ export class ChangePasswordDto {
   newPassword: string;
 }
 
+export interface TenantAssignmentDto {
+  tenantId: string;
+  tenantName: string;
+  tenantPath: string;
+  role: string;
+  permissions: string[]; // Resolved permissions (role + custom)
+}
+
 export class AuthResponseDto {
   accessToken: string;
   refreshToken: string;
@@ -70,6 +78,8 @@ export class AuthResponseDto {
     lastName: string;
     tenantId: string;
     role: string;
+    permissions: string[]; // Resolved permissions for primary tenant
+    tenants: TenantAssignmentDto[]; // All tenant assignments
   };
 }
 

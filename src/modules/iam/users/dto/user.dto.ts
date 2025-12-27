@@ -112,6 +112,12 @@ export class UpdateUserDto {
   @IsString()
   @IsOptional()
   avatarUrl?: string;
+
+  @ValidateNested({ each: true })
+  @Type(() => TenantAssignmentDto)
+  @IsArray()
+  @IsOptional()
+  tenants?: TenantAssignmentDto[];
 }
 
 export class AssignTenantDto {

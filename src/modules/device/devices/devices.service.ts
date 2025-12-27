@@ -28,6 +28,32 @@ export class DevicesService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Check if user has access to a specific tenant
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
+   */
+  private async hasUserAccessToTenant(user: AuthenticatedUser, tenantPath: string, tenantId: string): Promise<boolean> {
+    // Platform admin can access everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      return true;
+    }
+
+    // Check hierarchical access (tenant is descendant or ancestor)
+    if (tenantPath.startsWith(user.tenantPath) || user.tenantPath.startsWith(tenantPath)) {
+      return true;
+    }
+
+    // Check for direct tenant assignment
+    const directAssignment = await this.prisma.userTenant.findFirst({
+      where: {
+        userId: user.id,
+        tenantId: tenantId,
+      },
+    });
+
+    return !!directAssignment;
+  }
+
+  /**
    * Create a new device (inventory item)
    */
   async create(dto: CreateDeviceDto, user: AuthenticatedUser): Promise<Device> {
@@ -40,10 +66,10 @@ export class DevicesService {
       throw new NotFoundException('Tenant not found');
     }
 
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
+    // Check tenant access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, tenant.path, tenant.id);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this tenant');
     }
 
     // Verify device profile exists
@@ -113,10 +139,10 @@ export class DevicesService {
       throw new NotFoundException('Tenant not found');
     }
 
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
+    // Check tenant access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, tenant.path, tenant.id);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this tenant');
     }
 
     // Verify device profile exists
@@ -171,30 +197,57 @@ export class DevicesService {
   /**
    * Get the effective tenant path for filtering
    */
+  /**
+   * Get the effective tenant path for filtering
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
+   */
   private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
+    // Platform admin can see everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      if (tenantId) {
+        const selectedTenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { path: true },
+        });
+        return selectedTenant?.path || null;
+      }
+      return null;
+    }
+
     if (tenantId) {
+      // Check if user has direct assignment to the requested tenant
+      const userTenantAssignment = await this.prisma.userTenant.findFirst({
+        where: {
+          userId: user.id,
+          tenantId: tenantId,
+        },
+        include: {
+          tenant: {
+            select: { path: true },
+          },
+        },
+      });
+
+      if (userTenantAssignment) {
+        // User has direct assignment to this tenant - allow access
+        return userTenantAssignment.tenant.path;
+      }
+
+      // Check hierarchical access (user's tenant path contains selected tenant)
       const selectedTenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { path: true },
       });
 
-      if (!selectedTenant) {
-        return user.tenantPath;
+      if (selectedTenant && selectedTenant.path.startsWith(user.tenantPath)) {
+        return selectedTenant.path;
       }
 
-      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-        if (!selectedTenant.path.startsWith(user.tenantPath)) {
-          return user.tenantPath;
-        }
-      }
-
-      return selectedTenant.path;
+      // No access to requested tenant - fall back to user's primary tenant
+      return user.tenantPath;
     }
 
-    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
-      return null;
-    }
-
+    // No tenantId specified - use user's primary tenant path
     return user.tenantPath;
   }
 
@@ -303,13 +356,15 @@ export class DevicesService {
     user: AuthenticatedUser,
   ): Promise<Device[]> {
     // Verify tenant access
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-      });
-      if (!tenant || !tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) {
+      throw new ForbiddenException('Tenant not found');
+    }
+    const hasAccess = await this.hasUserAccessToTenant(user, tenant.path, tenantId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this tenant');
     }
 
     // Get compatible device profiles for this meter profile
@@ -366,8 +421,12 @@ export class DevicesService {
             id: true,
             serialNumber: true,
             status: true,
-            customer: {
-              select: { id: true, details: true },
+            subscription: {
+              select: { 
+                id: true, 
+                address: true,
+                customer: { select: { id: true, details: true } },
+              },
             },
             meterProfile: {
               select: { brand: true, modelCode: true },
@@ -381,11 +440,10 @@ export class DevicesService {
       throw new NotFoundException('Device not found');
     }
 
-    // Check access
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!device.tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this device');
-      }
+    // Check access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, device.tenant.path, device.tenantId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this device');
     }
 
     return device;

@@ -282,6 +282,28 @@ export class UsersService {
       }
     }
 
+    // Validate tenant assignments if provided
+    if (dto.tenants && dto.tenants.length > 0) {
+      for (const assignment of dto.tenants) {
+        // Verify tenant exists and user has access
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: assignment.tenantId },
+        });
+
+        if (!tenant) {
+          throw new BadRequestException(`Tenant ${assignment.tenantId} not found`);
+        }
+
+        // Non-platform admins can only assign to their tenant or descendants
+        if (currentUser.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
+          if (!tenant.path.startsWith(currentUser.tenantPath)) {
+            throw new ForbiddenException('You can only assign users to your tenant or descendants');
+          }
+        }
+      }
+    }
+
+    // Update user basic info
     const updated = await this.prisma.user.update({
       where: { id },
       data: {
@@ -295,6 +317,31 @@ export class UsersService {
         timezone: dto.timezone,
         avatarUrl: dto.avatarUrl,
       },
+    });
+
+    // Update tenant assignments if provided
+    if (dto.tenants !== undefined) {
+      // Delete existing assignments
+      await this.prisma.userTenant.deleteMany({
+        where: { userId: id },
+      });
+
+      // Create new assignments
+      if (dto.tenants.length > 0) {
+        await this.prisma.userTenant.createMany({
+          data: dto.tenants.map((t) => ({
+            userId: id,
+            tenantId: t.tenantId,
+            role: t.role,
+            permissions: t.permissions || [],
+          })),
+        });
+      }
+    }
+
+    // Fetch updated user with tenants
+    const result = await this.prisma.user.findUnique({
+      where: { id },
       select: {
         id: true,
         firstName: true,
@@ -320,7 +367,7 @@ export class UsersService {
     });
 
     this.logger.log(`Updated user: ${updated.email}`);
-    return updated;
+    return result;
   }
 
   /**

@@ -4,7 +4,7 @@
  * =============================================================================
  *
  * This script verifies that the Dashboard endpoints return real data from the
- * database, respecting the Asset/Device separation architecture.
+ * database, respecting the Subscription-based architecture.
  *
  * Tests:
  *   1. Auth: Login as Admin
@@ -28,7 +28,15 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { PrismaClient, MeterStatus, DeviceStatus, AlarmStatus, AlarmType } from '@prisma/client';
+import {
+  PrismaClient,
+  MeterStatus,
+  DeviceStatus,
+  AlarmStatus,
+  AlarmType,
+  SubscriptionType,
+  SubscriptionGroup,
+} from '@prisma/client';
 
 const API_BASE = process.env.API_URL || 'http://localhost:4000';
 
@@ -65,6 +73,7 @@ interface TestContext {
 interface DashboardStats {
   totalMeters: number;
   totalCustomers: number;
+  totalSubscriptions: number;
   totalReadings: number;
   totalWaterUsage: number;
   activeAlarms: number;
@@ -157,7 +166,7 @@ function printResult(result: TestResult): void {
 }
 
 // =============================================================================
-// Seed Helper (if DB is empty)
+// Seed Helper (if DB is empty) - Updated for Subscription Model
 // =============================================================================
 
 async function seedTestDataIfNeeded(): Promise<boolean> {
@@ -181,18 +190,14 @@ async function seedTestDataIfNeeded(): Promise<boolean> {
     console.log(`      Created tenant: ${tenant.name}`);
   }
 
-  // Get or create a customer
+  // Get or create a customer (no address here anymore)
   let customer = await prisma.customer.findFirst({ where: { tenantId: tenant.id } });
   if (!customer) {
     customer = await prisma.customer.create({
       data: {
         tenantId: tenant.id,
         customerType: 'INDIVIDUAL',
-        consumptionType: 'NORMAL',
         details: { firstName: 'Test', lastName: 'Customer' },
-        address: { city: 'Ankara', district: 'Çankaya' },
-        latitude: 39.9334,
-        longitude: 32.8597,
       },
     });
     console.log(`      Created customer: Test Customer`);
@@ -234,7 +239,7 @@ async function seedTestDataIfNeeded(): Promise<boolean> {
     console.log(`      Created device profile: ${deviceProfile.modelCode}`);
   }
 
-  // Create some test meters with locations
+  // Create some test locations
   const testLocations = [
     { lat: 39.9334, lng: 32.8597, name: 'Center' },
     { lat: 39.9254, lng: 32.8667, name: 'East' },
@@ -261,20 +266,31 @@ async function seedTestDataIfNeeded(): Promise<boolean> {
       },
     });
 
-    // Create meter linked to device (only first one)
-    const meter = await prisma.meter.create({
+    // Create subscription (address is HERE now)
+    const subscription = await prisma.subscription.create({
       data: {
         tenantId: tenant.id,
         customerId: customer.id,
+        subscriptionType: SubscriptionType.INDIVIDUAL,
+        subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
+        address: { city: 'Ankara', district: loc.name },
+        latitude: loc.lat,
+        longitude: loc.lng,
+        isActive: true,
+      },
+    });
+
+    // Create meter linked to subscription (no address on meter anymore)
+    const meter = await prisma.meter.create({
+      data: {
+        tenantId: tenant.id,
+        subscriptionId: subscription.id,
         meterProfileId: meterProfile.id,
         activeDeviceId: i === 0 ? device.id : null,
         serialNumber: serial,
         initialIndex: 0,
         installationDate: new Date(),
         status: i === 3 ? MeterStatus.MAINTENANCE : MeterStatus.ACTIVE,
-        latitude: loc.lat,
-        longitude: loc.lng,
-        address: { city: 'Ankara', district: loc.name },
       },
     });
 
@@ -369,23 +385,26 @@ async function test2_DashboardStats(ctx: TestContext): Promise<TestResult> {
   const dbMeterCount = await prisma.meter.count();
   const dbCustomerCount = await prisma.customer.count();
   const dbDeviceCount = await prisma.device.count();
+  const dbSubscriptionCount = await prisma.subscription.count();
 
   const metersMatch = stats.totalMeters === dbMeterCount;
   const customersMatch = stats.totalCustomers === dbCustomerCount;
   const devicesMatch = stats.totalDevices === dbDeviceCount;
+  const subscriptionsMatch = stats.totalSubscriptions === dbSubscriptionCount;
 
-  const allMatch = metersMatch && customersMatch && devicesMatch;
+  const allMatch = metersMatch && customersMatch && devicesMatch && subscriptionsMatch;
 
   return {
     name: 'GET /dashboard/stats',
     passed: allMatch,
     details: allMatch
-      ? `Stats match DB: ${stats.totalMeters} meters, ${stats.totalCustomers} customers, ${stats.totalDevices} devices`
-      : `Mismatch! API: meters=${stats.totalMeters}, customers=${stats.totalCustomers}, devices=${stats.totalDevices}. DB: meters=${dbMeterCount}, customers=${dbCustomerCount}, devices=${dbDeviceCount}`,
+      ? `Stats match DB: ${stats.totalMeters} meters, ${stats.totalCustomers} customers, ${stats.totalDevices} devices, ${stats.totalSubscriptions} subscriptions`
+      : `Mismatch! API: meters=${stats.totalMeters}, customers=${stats.totalCustomers}, devices=${stats.totalDevices}, subscriptions=${stats.totalSubscriptions}. DB: meters=${dbMeterCount}, customers=${dbCustomerCount}, devices=${dbDeviceCount}, subscriptions=${dbSubscriptionCount}`,
     data: {
       totalMeters: stats.totalMeters,
       totalCustomers: stats.totalCustomers,
       totalDevices: stats.totalDevices,
+      totalSubscriptions: stats.totalSubscriptions,
       activeAlarms: stats.activeAlarms,
       totalWaterUsage: stats.totalWaterUsage,
     },

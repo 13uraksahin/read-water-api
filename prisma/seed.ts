@@ -1,9 +1,8 @@
 // =============================================================================
-// Read Water - Seed 2 Script (Development/Demo Environment)
+// Read Water - Seed Script (Development/Demo Environment)
 // =============================================================================
-// SEED 2: Lighter dataset for development and demos
-// - 100 meters per batch (1,700 total)
-// - 45 days of readings (24 readings/day)
+// Updated for Subscription Model:
+// Tenant → Customer → Subscription → Meter → Device
 // =============================================================================
 
 import 'dotenv/config';
@@ -12,7 +11,7 @@ import {
   CommunicationTechnology,
   IntegrationType,
   SystemRole,
-  SubscriptionStatus,
+  TenantSubscriptionStatus,
   DeviceBrand,
   DeviceStatus,
   Brand,
@@ -25,7 +24,8 @@ import {
   IPRating,
   MeterStatus,
   CustomerType,
-  ConsumptionType,
+  SubscriptionType,
+  SubscriptionGroup,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -114,6 +114,7 @@ async function teardown(): Promise<void> {
     { name: 'ActivityLogs', action: async () => { await prisma.activityLog.deleteMany(); }},
     { name: 'Meters', action: async () => { await prisma.meter.deleteMany(); }},
     { name: 'Devices', action: async () => { await prisma.device.deleteMany(); }},
+    { name: 'Subscriptions', action: async () => { await prisma.subscription.deleteMany(); }},
     { name: 'Customers', action: async () => { await prisma.customer.deleteMany(); }},
     { name: 'RefreshTokens', action: async () => { await prisma.refreshToken.deleteMany(); }},
     { name: 'UserTenants', action: async () => { await prisma.userTenant.deleteMany(); }},
@@ -158,7 +159,7 @@ async function createTenants() {
       contactFirstName: 'System',
       contactLastName: 'Administrator',
       contactEmail: 'admin@readwater.io',
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      tenantSubscriptionStatus: TenantSubscriptionStatus.ACTIVE,
       subscriptionPlan: 'enterprise',
       address: {
         city: 'Istanbul',
@@ -175,7 +176,7 @@ async function createTenants() {
       contactLastName: 'Yetkili',
       contactEmail: 'aski.yetkili@example.com',
       contactPhone: '+908887776655',
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      tenantSubscriptionStatus: TenantSubscriptionStatus.ACTIVE,
       subscriptionPlan: 'enterprise',
       latitude: ASKI_BASE_LAT,
       longitude: ASKI_BASE_LNG,
@@ -194,7 +195,7 @@ async function createTenants() {
       contactLastName: 'Yetkili',
       contactEmail: 'hatsu.yetkili@example.com',
       contactPhone: '+907776665544',
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      tenantSubscriptionStatus: TenantSubscriptionStatus.ACTIVE,
       subscriptionPlan: 'enterprise',
       latitude: HATSU_BASE_LAT,
       longitude: HATSU_BASE_LNG,
@@ -219,7 +220,7 @@ async function createTenants() {
         contactLastName: tenant.contactLastName,
         contactEmail: tenant.contactEmail,
         contactPhone: tenant.contactPhone,
-        subscriptionStatus: tenant.subscriptionStatus,
+        tenantSubscriptionStatus: tenant.tenantSubscriptionStatus,
         subscriptionPlan: tenant.subscriptionPlan,
         latitude: tenant.latitude,
         longitude: tenant.longitude,
@@ -345,14 +346,6 @@ async function createCommunicationTechDefs() {
 
 // -----------------------------------------------------------------------------
 // B.4: Create Meter Profiles (10 Total)
-// Per Seed 2 spec:
-// - 2 Manas → HATSU
-// - 2 Itron → HATSU + ASKİ
-// - 2 Baylan → HATSU + ASKİ
-// - 2 Zenner → HATSU
-// - 1 Cem → HATSU
-// - 1 Klepsan → HATSU
-// Note: ASKİ needs access to all profiles used in ASKİ batches
 // -----------------------------------------------------------------------------
 async function createMeterProfiles(tenants: Record<string, string>) {
   console.log('\n📊 Creating Meter Profiles (10 Total)...');
@@ -361,7 +354,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
   const askiId = tenants['root.aski'];
 
   const meterProfilesData = [
-    // [0] Manas_A (View: HATSU + ASKİ - needed for ASKİ batch)
+    // [0] Manas_A
     {
       brand: Brand.MANAS,
       modelCode: 'MNS-A-DN15',
@@ -376,7 +369,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.RETROFIT,
       allowedTenants: [hatsuId, askiId],
     },
-    // [1] Manas_B (View: HATSU + ASKİ - needed for ASKİ batch)
+    // [1] Manas_B
     {
       brand: Brand.MANAS,
       modelCode: 'MNS-B-DN20',
@@ -391,7 +384,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.INTEGRATED,
       allowedTenants: [hatsuId, askiId],
     },
-    // [2] Itron_A (View: HATSU + ASKİ)
+    // [2] Itron_A
     {
       brand: Brand.ITRON,
       modelCode: 'ITR-A-DN15',
@@ -406,7 +399,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.RETROFIT,
       allowedTenants: [hatsuId, askiId],
     },
-    // [3] Itron_B (View: HATSU + ASKİ)
+    // [3] Itron_B
     {
       brand: Brand.ITRON,
       modelCode: 'ITR-B-DN20',
@@ -421,7 +414,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.RETROFIT,
       allowedTenants: [hatsuId, askiId],
     },
-    // [4] Baylan_A (View: HATSU + ASKİ)
+    // [4] Baylan_A
     {
       brand: Brand.BAYLAN,
       modelCode: 'BYL-A-DN15',
@@ -436,7 +429,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.RETROFIT,
       allowedTenants: [hatsuId, askiId],
     },
-    // [5] Baylan_B (View: HATSU + ASKİ)
+    // [5] Baylan_B
     {
       brand: Brand.BAYLAN,
       modelCode: 'BYL-B-DN20',
@@ -451,7 +444,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.RETROFIT,
       allowedTenants: [hatsuId, askiId],
     },
-    // [6] Zenner_A (View: HATSU + ASKİ - needed for ASKİ batch)
+    // [6] Zenner_A
     {
       brand: Brand.ZENNER,
       modelCode: 'ZEN-A-DN15',
@@ -466,7 +459,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.INTEGRATED,
       allowedTenants: [hatsuId, askiId],
     },
-    // [7] Zenner_B (View: HATSU + ASKİ - needed for ASKİ batch)
+    // [7] Zenner_B
     {
       brand: Brand.ZENNER,
       modelCode: 'ZEN-B-DN20',
@@ -481,7 +474,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.INTEGRATED,
       allowedTenants: [hatsuId, askiId],
     },
-    // [8] Cem_A (View: HATSU + ASKİ - needed for ASKİ batch)
+    // [8] Cem_A
     {
       brand: Brand.CEM,
       modelCode: 'CEM-A-DN15',
@@ -496,7 +489,7 @@ async function createMeterProfiles(tenants: Record<string, string>) {
       communicationModule: CommunicationModule.RETROFIT,
       allowedTenants: [hatsuId, askiId],
     },
-    // [9] Klepsan_A (View: HATSU)
+    // [9] Klepsan_A
     {
       brand: Brand.KLEPSAN,
       modelCode: 'KLP-A-DN15',
@@ -532,20 +525,12 @@ async function createMeterProfiles(tenants: Record<string, string>) {
 
 // -----------------------------------------------------------------------------
 // B.5: Create Device Profiles (7 Total)
-// Per Seed 2 spec:
-// - 1 Manas | Manas + Itron compat | HATSU + ASKİ
-// - 1 Itron | Manas + Itron compat | HATSU + ASKİ
-// - 1 Baylan | Baylan compat | HATSU + ASKİ
-// - 1 Cem | Cem compat | HATSU
-// - 1 Klepsan | Klepsan compat | HATSU
-// - 1 Ima | All compat | HATSU + ASKİ
-// - 1 Codigno | Manas + Itron compat | HATSU + ASKİ
 // -----------------------------------------------------------------------------
 async function createDeviceProfiles(meterProfiles: string[]) {
   console.log('\n📱 Creating Device Profiles (7 Total)...');
 
   const deviceProfilesData = [
-    // [0] Manas_Dev - Compatible with Manas + Itron profiles
+    // [0] Manas_Dev
     {
       brand: DeviceBrand.MANAS,
       modelCode: 'MNS-DEV-LW01',
@@ -560,7 +545,7 @@ async function createDeviceProfiles(meterProfiles: string[]) {
       batteryLifeMonths: 120,
       compatibleMeterProfiles: [meterProfiles[0], meterProfiles[1], meterProfiles[2], meterProfiles[3]],
     },
-    // [1] Itron_Dev - Compatible with Manas + Itron profiles
+    // [1] Itron_Dev
     {
       brand: DeviceBrand.ITRON,
       modelCode: 'ITR-DEV-NB01',
@@ -574,7 +559,7 @@ async function createDeviceProfiles(meterProfiles: string[]) {
       batteryLifeMonths: 84,
       compatibleMeterProfiles: [meterProfiles[0], meterProfiles[1], meterProfiles[2], meterProfiles[3]],
     },
-    // [2] Baylan_Dev - Compatible with Baylan profiles
+    // [2] Baylan_Dev
     {
       brand: DeviceBrand.BAYLAN,
       modelCode: 'BYL-DEV-LW01',
@@ -589,7 +574,7 @@ async function createDeviceProfiles(meterProfiles: string[]) {
       batteryLifeMonths: 96,
       compatibleMeterProfiles: [meterProfiles[4], meterProfiles[5]],
     },
-    // [3] Cem_Dev - Compatible with Cem profiles
+    // [3] Cem_Dev
     {
       brand: DeviceBrand.CEM,
       modelCode: 'CEM-DEV-SF01',
@@ -603,7 +588,7 @@ async function createDeviceProfiles(meterProfiles: string[]) {
       batteryLifeMonths: 60,
       compatibleMeterProfiles: [meterProfiles[8]],
     },
-    // [4] Klepsan_Dev - Compatible with Klepsan profiles
+    // [4] Klepsan_Dev
     {
       brand: DeviceBrand.KLEPSAN,
       modelCode: 'KLP-DEV-LW01',
@@ -618,7 +603,7 @@ async function createDeviceProfiles(meterProfiles: string[]) {
       batteryLifeMonths: 72,
       compatibleMeterProfiles: [meterProfiles[9]],
     },
-    // [5] Ima_Dev - Universal compatibility (Manas + Itron + Baylan + Zenner + Cem + Klepsan)
+    // [5] Ima_Dev - Universal
     {
       brand: DeviceBrand.IMA,
       modelCode: 'IMA-DEV-LW01',
@@ -631,12 +616,12 @@ async function createDeviceProfiles(meterProfiles: string[]) {
       ],
       decoderFunction: 'function decode(payload) { return { value: parseInt(payload, 16) / 1000 }; }',
       batteryLifeMonths: 120,
-      compatibleMeterProfiles: meterProfiles, // All profiles
+      compatibleMeterProfiles: meterProfiles,
     },
-    // [6] Codigno_Dev - Compatible with Manas + Itron
+    // [6] Inodya_Dev
     {
-      brand: DeviceBrand.CODIGNO,
-      modelCode: 'CDG-DEV-NB01',
+      brand: DeviceBrand.INODYA,
+      modelCode: 'IND-DEV-NB01',
       communicationTechnology: CommunicationTechnology.NB_IOT,
       integrationType: IntegrationType.HTTP,
       fieldDefinitions: [
@@ -666,8 +651,8 @@ async function createDeviceProfiles(meterProfiles: string[]) {
 }
 
 // -----------------------------------------------------------------------------
-// B.6: Create Bulk Assets (Devices + Customers + Meters)
-// SEED 2: All batches are 100 units
+// B.6: Create Bulk Assets (Devices + Customers + Subscriptions + Meters)
+// NEW: Creates Subscriptions as the linking entity
 // -----------------------------------------------------------------------------
 interface AssetBatch {
   count: number;
@@ -682,35 +667,22 @@ async function createBulkAssets(
   meterProfiles: string[],
   deviceProfiles: string[]
 ) {
-  console.log('\n📦 Creating Bulk Assets (Seed 2 - 100 per batch)...\n');
+  console.log('\n📦 Creating Bulk Assets (with Subscription Model)...\n');
 
-  // Define all batches per Seed 2 specification
+  // Define all batches per Seed specification
+  // HATSU: 50 meters, ASKİ: 100 meters (simplified for demo)
   const batches: AssetBatch[] = [
-    // HATSU Tenant (4 batches × 100 = 400 units)
-    { count: 100, meterProfileIdx: 2, deviceProfileIdx: 1, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-A' },   // Itron[0] + Itron
-    { count: 100, meterProfileIdx: 4, deviceProfileIdx: 2, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-B' },   // Baylan[0] + Baylan
-    { count: 100, meterProfileIdx: 6, deviceProfileIdx: 5, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-C' },   // Zenner[0] + Ima
-    { count: 100, meterProfileIdx: 9, deviceProfileIdx: 4, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-D' },   // Klepsan + Klepsan
+    // HATSU Tenant
+    { count: 50, meterProfileIdx: 2, deviceProfileIdx: 1, tenantPath: 'root.hatsu', serialPrefix: 'HATSU-A' },
     
-    // ASKİ Tenant (13 batches × 100 = 1,300 units)
-    { count: 100, meterProfileIdx: 0, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-A1' },    // Manas[0] + Itron
-    { count: 100, meterProfileIdx: 0, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-A2' },    // Manas[0] + Ima
-    { count: 100, meterProfileIdx: 1, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-B1' },    // Manas[1] + Itron
-    { count: 100, meterProfileIdx: 1, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-B2' },    // Manas[1] + Ima
-    { count: 100, meterProfileIdx: 2, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-C1' },    // Itron[0] + Itron
-    { count: 100, meterProfileIdx: 2, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-C2' },    // Itron[0] + Ima
-    { count: 100, meterProfileIdx: 3, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-D1' },    // Itron[1] + Itron
-    { count: 100, meterProfileIdx: 3, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-D2' },    // Itron[1] + Ima
-    { count: 100, meterProfileIdx: 4, deviceProfileIdx: 2, tenantPath: 'root.aski', serialPrefix: 'ASKI-E1' },    // Baylan[0] + Baylan
-    { count: 100, meterProfileIdx: 5, deviceProfileIdx: 2, tenantPath: 'root.aski', serialPrefix: 'ASKI-F1' },    // Baylan[1] + Baylan
-    { count: 100, meterProfileIdx: 6, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-G1' },    // Zenner[0] + Ima
-    { count: 100, meterProfileIdx: 7, deviceProfileIdx: 5, tenantPath: 'root.aski', serialPrefix: 'ASKI-H1' },    // Zenner[1] + Ima
-    { count: 100, meterProfileIdx: 8, deviceProfileIdx: 3, tenantPath: 'root.aski', serialPrefix: 'ASKI-I1' },    // Cem[0] + Cem
+    // ASKİ Tenant
+    { count: 100, meterProfileIdx: 0, deviceProfileIdx: 1, tenantPath: 'root.aski', serialPrefix: 'ASKI-A' },
   ];
 
   let globalDeviceCounter = 0;
   let globalMeterCounter = 0;
   let globalCustomerCounter = 0;
+  let globalSubscriptionCounter = 0;
 
   for (const batch of batches) {
     const tenantId = tenants[batch.tenantPath];
@@ -719,8 +691,9 @@ async function createBulkAssets(
     const isHatsu = batch.tenantPath === 'root.hatsu';
     const baseLat = isHatsu ? HATSU_BASE_LAT : ASKI_BASE_LAT;
     const baseLng = isHatsu ? HATSU_BASE_LNG : ASKI_BASE_LNG;
+    const city = isHatsu ? 'Hatay' : 'Ankara';
 
-    console.log(`\n   📍 ${batch.serialPrefix}: ${batch.count} units (MeterProfile[${batch.meterProfileIdx}] + DeviceProfile[${batch.deviceProfileIdx}])`);
+    console.log(`\n   📍 ${batch.serialPrefix}: ${batch.count} units`);
 
     // Generate all data for this batch
     const items: Array<{
@@ -755,7 +728,7 @@ async function createBulkAssets(
       BATCH_SIZE,
       async (batchItems) => {
         await prisma.$transaction(async (tx) => {
-          // Create devices
+          // 1. Create devices
           await tx.device.createMany({
             data: batchItems.map(item => ({
               serialNumber: item.deviceSerial,
@@ -773,20 +746,22 @@ async function createBulkAssets(
           });
           const deviceMap = new Map(devices.map(d => [d.serialNumber, d.id]));
 
-          // Create customers
+          // 2. Create customers (no address - address is on Subscription)
           await tx.customer.createMany({
-            data: batchItems.map(item => ({
+            data: batchItems.map((item, idx) => ({
               tenantId,
+              customerNumber: `C-${batch.serialPrefix}-${String(globalCustomerCounter - batchItems.length + idx + 1).padStart(4, '0')}`,
               customerType: CustomerType.INDIVIDUAL,
-              consumptionType: ConsumptionType.NORMAL,
-              details: { firstName: item.customerName, lastName: 'Auto', tcIdNo: randomHex(11) },
-              address: { city: isHatsu ? 'Hatay' : 'Ankara', district: 'Merkez' },
-              latitude: item.coords.lat,
-              longitude: item.coords.lng,
+              details: { 
+                firstName: item.customerName, 
+                lastName: 'Auto', 
+                tcIdNo: randomHex(11),
+                phone: `+90${randomHex(10)}`,
+              },
             })),
           });
 
-          // Get created customers (match by name pattern)
+          // Get created customers
           const customers = await tx.customer.findMany({
             where: { tenantId },
             orderBy: { createdAt: 'desc' },
@@ -794,19 +769,49 @@ async function createBulkAssets(
             select: { id: true },
           });
 
-          // Create meters
+          // 3. Create subscriptions (with address)
+          const subscriptionsData = batchItems.map((item, idx) => {
+            globalSubscriptionCounter++;
+            return {
+              tenantId,
+              subscriptionNumber: `S-${batch.serialPrefix}-${String(globalSubscriptionCounter).padStart(4, '0')}`,
+              customerId: customers[idx]?.id || customers[0].id,
+              subscriptionType: SubscriptionType.INDIVIDUAL,
+              subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
+              address: { 
+                city, 
+                district: 'Merkez',
+                neighborhood: `Mahalle ${globalSubscriptionCounter}`,
+                street: `Sokak ${globalSubscriptionCounter}`,
+                buildingNo: String(Math.floor(Math.random() * 100) + 1),
+              },
+              latitude: item.coords.lat,
+              longitude: item.coords.lng,
+              isActive: true,
+              startDate: new Date(Date.now() - Math.random() * 45 * 24 * 60 * 60 * 1000),
+            };
+          });
+
+          await tx.subscription.createMany({ data: subscriptionsData });
+
+          // Get created subscriptions
+          const subscriptions = await tx.subscription.findMany({
+            where: { tenantId },
+            orderBy: { createdAt: 'desc' },
+            take: batchItems.length,
+            select: { id: true },
+          });
+
+          // 4. Create meters (linked to subscription, not customer)
           const metersData = batchItems.map((item, idx) => ({
             serialNumber: item.meterSerial,
             tenantId,
-            customerId: customers[idx]?.id || customers[0].id,
+            subscriptionId: subscriptions[idx]?.id || subscriptions[0].id,
             meterProfileId,
             activeDeviceId: deviceMap.get(item.deviceSerial),
             initialIndex: Math.random() * 1000,
-            installationDate: new Date(Date.now() - Math.random() * 45 * 24 * 60 * 60 * 1000), // Within last 45 days
+            installationDate: new Date(Date.now() - Math.random() * 45 * 24 * 60 * 60 * 1000),
             status: MeterStatus.ACTIVE,
-            address: { city: isHatsu ? 'Hatay' : 'Ankara', district: 'Merkez' },
-            latitude: item.coords.lat,
-            longitude: item.coords.lng,
           }));
 
           await tx.meter.createMany({ data: metersData });
@@ -817,13 +822,14 @@ async function createBulkAssets(
   }
 
   console.log(`\n   ✓ Total Devices: ${globalDeviceCounter}`);
-  console.log(`   ✓ Total Meters: ${globalMeterCounter}`);
   console.log(`   ✓ Total Customers: ${globalCustomerCounter}`);
+  console.log(`   ✓ Total Subscriptions: ${globalSubscriptionCounter}`);
+  console.log(`   ✓ Total Meters: ${globalMeterCounter}`);
 }
 
 // -----------------------------------------------------------------------------
 // B.7: Create Golden Record (Kemalettin ŞAHİN)
-// With exact coordinates from Seed 2
+// Updated for Subscription model
 // -----------------------------------------------------------------------------
 async function createGoldenRecord(
   tenants: Record<string, string>,
@@ -834,16 +840,18 @@ async function createGoldenRecord(
 
   const askiId = tenants['root.aski'];
 
-  // Exact coordinates from Seed 2
-  const meter1Coords = { lat: 39.99451679511336, lng: 32.86308219026244 };
-  const meter2Coords = { lat: 39.89441311052211, lng: 32.81460781844764 };
+  // Exact coordinates
+  const locations = [
+    { lat: 39.99451679511336, lng: 32.86308219026244, neighborhood: 'Tepebaşı Mahallesi', street: 'Foça Sokak', building: '100' },
+    { lat: 39.89441311052211, lng: 32.81460781844764, neighborhood: 'Ehlibeyt Mahallesi', street: 'Tekstilciler Caddesi', building: '16' },
+  ];
 
-  // Create the special customer
+  // 1. Create the special customer (no address)
   const customer = await prisma.customer.create({
     data: {
       tenantId: askiId,
+      customerNumber: 'CASKI-GOLDEN-001',
       customerType: CustomerType.INDIVIDUAL,
-      consumptionType: ConsumptionType.NORMAL,
       details: {
         firstName: 'Kemalettin',
         lastName: 'ŞAHİN',
@@ -851,29 +859,18 @@ async function createGoldenRecord(
         phone: '+905551234567',
         email: 'kemalettin.sahin@example.com',
       },
-      address: {
-        city: 'Ankara',
-        district: 'Keçiören',
-        neighborhood: 'Tepebaşı Mahallesi',
-        street: 'Foça Sokak',
-        buildingNo: '100',
-        floor: '2',
-        postalCode: '06390',
-      },
-      latitude: meter1Coords.lat,
-      longitude: meter1Coords.lng,
     },
   });
 
   console.log(`   ✓ Customer: Kemalettin ŞAHİN (${customer.id})`);
 
-  // Create dedicated devices for golden record meters
+  // 2. Create dedicated devices
   const goldenDevices = await Promise.all([
     prisma.device.create({
       data: {
         serialNumber: 'GOLDEN-DEV-001',
         tenantId: askiId,
-        deviceProfileId: deviceProfiles[1], // Itron device
+        deviceProfileId: deviceProfiles[1],
         status: DeviceStatus.ACTIVE,
         dynamicFields: { IMEI: '999999999990001', IMSI: '999999999990001' },
       },
@@ -882,68 +879,63 @@ async function createGoldenRecord(
       data: {
         serialNumber: 'GOLDEN-DEV-002',
         tenantId: askiId,
-        deviceProfileId: deviceProfiles[1], // Itron device
+        deviceProfileId: deviceProfiles[1],
         status: DeviceStatus.ACTIVE,
         dynamicFields: { IMEI: '999999999990002', IMSI: '999999999990002' },
       },
     }),
   ]);
 
-  console.log(`   ✓ Created 2 dedicated devices for golden record`);
+  console.log(`   ✓ Created 2 dedicated devices`);
 
-  // Meter addresses per Seed 2
-  const meterAddresses = [
-    {
-      address: {
-        city: 'Ankara',
-        district: 'Keçiören',
-        neighborhood: 'Tepebaşı Mahallesi',
-        street: 'Foça Sokak',
-        buildingNo: '100',
-        floor: '2',
-        postalCode: '06390',
-      },
-      lat: meter1Coords.lat,
-      lng: meter1Coords.lng,
-    },
-    {
-      address: {
-        city: 'Ankara',
-        district: 'Çankaya',
-        neighborhood: 'Ehlibeyt Mahallesi',
-        street: 'Tekstilciler Caddesi',
-        buildingNo: '16',
-        floor: '4',
-        postalCode: '06520',
-      },
-      lat: meter2Coords.lat,
-      lng: meter2Coords.lng,
-    },
-  ];
-
+  // 3. Create subscriptions with addresses (one per meter location)
   for (let i = 0; i < 2; i++) {
+    const loc = locations[i];
+    
+    // Create subscription (contains the address)
+    const subscription = await prisma.subscription.create({
+      data: {
+        tenantId: askiId,
+        subscriptionNumber: `SASKI-GOLDEN-00${i + 1}`,
+        customerId: customer.id,
+        subscriptionType: SubscriptionType.INDIVIDUAL,
+        subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
+        address: {
+          city: 'Ankara',
+          district: i === 0 ? 'Keçiören' : 'Çankaya',
+          neighborhood: loc.neighborhood,
+          street: loc.street,
+          buildingNo: loc.building,
+          floor: i === 0 ? '2' : '4',
+          postalCode: i === 0 ? '06390' : '06520',
+        },
+        latitude: loc.lat,
+        longitude: loc.lng,
+        isActive: true,
+        startDate: new Date('2024-10-01'),
+      },
+    });
+
+    // Create meter linked to subscription
     const meter = await prisma.meter.create({
       data: {
         serialNumber: `GOLDEN-MTR-${i + 1}`,
         tenantId: askiId,
-        customerId: customer.id,
-        meterProfileId: meterProfiles[2], // Itron_A
+        subscriptionId: subscription.id,
+        meterProfileId: meterProfiles[2],
         activeDeviceId: goldenDevices[i].id,
         initialIndex: 0,
         installationDate: new Date('2024-10-01'),
         status: MeterStatus.ACTIVE,
-        address: meterAddresses[i].address,
-        latitude: meterAddresses[i].lat,
-        longitude: meterAddresses[i].lng,
       },
     });
-    console.log(`   ✓ Meter ${i + 1}: ${meter.serialNumber} @ ${meterAddresses[i].address.neighborhood}`);
+
+    console.log(`   ✓ Subscription ${i + 1} + Meter: ${meter.serialNumber} @ ${loc.neighborhood}`);
   }
 }
 
 // =============================================================================
-// PART C: HISTORICAL READINGS (SQL Generation)
-// SEED 2: 24 readings/day × 45 days with realistic values
+// PART C: HISTORICAL READINGS
 // =============================================================================
 async function generateHistoricalReadings() {
   console.log('\n📈 PART C: Generating Historical Readings (45 days, 24 readings/day)...');
@@ -952,8 +944,6 @@ async function generateHistoricalReadings() {
   const startTime = Date.now();
 
   // Generate readings using pure SQL for maximum performance
-  // 24 readings/day = 1 reading per hour
-  // Includes: realistic consumption patterns, signal strength, battery, temperature
   await prisma.$executeRaw`
     INSERT INTO "readings" (
       "id", 
@@ -976,36 +966,21 @@ async function generateHistoricalReadings() {
       time_series.ts as time,
       m.tenant_id as tenant_id,
       m.id as meter_id,
-      
-      -- CUMULATIVE VALUE: Initial Index + accumulated consumption
-      -- Uses a window function approach via subquery for cumulative sum
       m.initial_index + (
-        -- Calculate hours since start
         (EXTRACT(EPOCH FROM (time_series.ts - (NOW() - interval '45 days'))) / 3600)
-        -- Base hourly rate with time-of-day variation
         * (
           CASE 
-            -- Night hours (00:00 - 06:00): Very low usage
             WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 0 AND 5 THEN 0.005
-            -- Early morning (06:00 - 08:00): Rising usage (showers, breakfast)
             WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 6 AND 7 THEN 0.08
-            -- Morning peak (08:00 - 10:00): High usage
             WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 8 AND 9 THEN 0.12
-            -- Mid-day (10:00 - 17:00): Moderate usage
             WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 10 AND 16 THEN 0.04
-            -- Evening peak (17:00 - 21:00): High usage (cooking, cleaning, showers)
             WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 17 AND 20 THEN 0.10
-            -- Late evening (21:00 - 23:59): Declining usage
             ELSE 0.02
           END
         )
-        -- Weekend factor (slightly higher on weekends)
         * (CASE WHEN EXTRACT(DOW FROM time_series.ts) IN (0, 6) THEN 1.15 ELSE 1.0 END)
-        -- Add some randomness (±20%)
         * (0.8 + random() * 0.4)
       ) as value,
-      
-      -- HOURLY CONSUMPTION: Water used in this hour
       (
         CASE 
           WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 0 AND 5 THEN 0.005
@@ -1018,49 +993,19 @@ async function generateHistoricalReadings() {
       ) 
       * (CASE WHEN EXTRACT(DOW FROM time_series.ts) IN (0, 6) THEN 1.15 ELSE 1.0 END)
       * (0.8 + random() * 0.4) as consumption,
-      
       'm3' as unit,
-      
-      -- SIGNAL STRENGTH: -60 to -110 dBm (varies with some randomness)
-      -- Better signal during day, slightly worse at night
-      (
-        -70 
-        - (random() * 30)::int  -- Random variation -70 to -100
-        - (CASE WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 2 AND 5 THEN 5 ELSE 0 END)  -- Slightly worse at night
-      )::int as signal_strength,
-      
-      -- BATTERY LEVEL: Starts at 100%, slowly decreases over 45 days
-      -- Decreases roughly 0.5% per day, with small random variations
-      GREATEST(
-        85,
-        100 - (
-          (EXTRACT(EPOCH FROM (time_series.ts - (NOW() - interval '45 days'))) / 86400) * 0.3
-        )::int - (random() * 2)::int
-      )::int as battery_level,
-      
-      -- TEMPERATURE: Ambient temperature (10-25°C typical, varies by time of day)
-      (
-        15.0  -- Base temp
-        + (CASE 
-            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 12 AND 16 THEN 8  -- Warmer midday
-            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 6 AND 11 THEN 4   -- Morning warmup
-            WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 17 AND 20 THEN 5  -- Evening cooldown
-            ELSE 0  -- Night (coolest)
-          END)
-        + (random() * 4 - 2)  -- Random variation ±2°C
-      )::decimal(5,2) as temperature,
-      
+      (-70 - (random() * 30)::int - (CASE WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 2 AND 5 THEN 5 ELSE 0 END))::int as signal_strength,
+      GREATEST(85, 100 - ((EXTRACT(EPOCH FROM (time_series.ts - (NOW() - interval '45 days'))) / 86400) * 0.3)::int - (random() * 2)::int)::int as battery_level,
+      (15.0 + (CASE 
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 12 AND 16 THEN 8
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 6 AND 11 THEN 4
+          WHEN EXTRACT(HOUR FROM time_series.ts) BETWEEN 17 AND 20 THEN 5
+          ELSE 0
+        END) + (random() * 4 - 2))::decimal(5,2) as temperature,
       'LORAWAN' as source,
-      
-      -- Link to the meter's active device
       m.active_device_id as source_device_id,
-      
-      -- Communication technology
       'LORAWAN'::"CommunicationTechnology" as communication_technology,
-      
-      -- Processed timestamp (slightly after reading time)
       time_series.ts + interval '1 second' * (random() * 5) as processed_at
-      
     FROM "meters" m
     CROSS JOIN generate_series(
       NOW() - interval '45 days',
@@ -1072,7 +1017,6 @@ async function generateHistoricalReadings() {
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
   
-  // Get count
   const countResult = await prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM readings`;
   const readingsCount = Number(countResult[0].count);
 
@@ -1099,8 +1043,7 @@ async function generateHistoricalReadings() {
 
   console.log('   ✓ Updated meter last reading values');
 
-  // Update devices with their last communication data from readings
-  // Every reading = device communication, so devices should reflect the last reading's metrics
+  // Update devices with their last communication data
   console.log('   📡 Updating devices with last communication data...');
   
   await prisma.$executeRaw`
@@ -1119,7 +1062,7 @@ async function generateHistoricalReadings() {
       WHERE source_device_id IS NOT NULL
       ORDER BY source_device_id, time DESC
     ) r
-    WHERE d.id = r.source_device_id
+    WHERE d.id = r.source_device_id::uuid
   `;
 
   console.log('   ✓ Updated device communication data');
@@ -1130,7 +1073,7 @@ async function generateHistoricalReadings() {
 // =============================================================================
 async function main() {
   console.log('='.repeat(80));
-  console.log('🌱 READ WATER - SEED 2 (Development/Demo Environment)');
+  console.log('🌱 READ WATER - SEED (Subscription Model)');
   console.log('='.repeat(80));
 
   const startTime = Date.now();
@@ -1156,7 +1099,7 @@ async function main() {
   // B.5: Device Profiles
   const deviceProfiles = await createDeviceProfiles(meterProfiles);
 
-  // B.6: Bulk Assets
+  // B.6: Bulk Assets (with Subscriptions)
   await createBulkAssets(tenants, meterProfiles, deviceProfiles);
 
   // B.7: Golden Record
@@ -1169,7 +1112,7 @@ async function main() {
   const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log('\n' + '='.repeat(80));
-  console.log('🎉 SEED 2 COMPLETED SUCCESSFULLY!');
+  console.log('🎉 SEED COMPLETED SUCCESSFULLY!');
   console.log('='.repeat(80));
   console.log(`\n⏱️  Total Duration: ${totalDuration}s\n`);
   console.log('📊 Summary:');
@@ -1178,23 +1121,12 @@ async function main() {
   console.log('   • Password: Asdf1234.');
   console.log('   • Meter Profiles: 10');
   console.log('   • Device Profiles: 7');
-  console.log('   • HATSU Assets: 400 meters (4 batches × 100)');
-  console.log('   • ASKİ Assets: 1,300 meters (13 batches × 100)');
-  console.log('   • Golden Record: Kemalettin ŞAHİN (2 meters)');
-  console.log('   • Total Meters: 1,702');
-  console.log('   • Readings: ~1.8M (45 days × 24/day × 1,702 meters)');
+  console.log('   • HATSU: 50 Customers → 50 Subscriptions → 50 Meters');
+  console.log('   • ASKİ: 100 Customers → 100 Subscriptions → 100 Meters');
+  console.log('   • Golden Record: Kemalettin ŞAHİN (1 Customer → 2 Subscriptions → 2 Meters)');
   console.log('');
-  console.log('📈 Reading Fields Populated:');
-  console.log('   • value: Cumulative meter index (m³)');
-  console.log('   • consumption: Hourly consumption with day/night patterns');
-  console.log('   • signal_strength: -60 to -110 dBm');
-  console.log('   • battery_level: 85-100% (slowly decreasing)');
-  console.log('   • temperature: 10-25°C (time-of-day variation)');
-  console.log('   • source_device_id: Linked to active device');
-  console.log('');
-  console.log('🔄 Data Consistency:');
-  console.log('   • Meters updated with last_reading_value/time');
-  console.log('   • Devices updated with last_signal_strength/battery/communication_at');
+  console.log('🔗 Entity Hierarchy:');
+  console.log('   Tenant → Customer → Subscription (has Address) → Meter → Device');
   console.log('\n' + '='.repeat(80) + '\n');
 }
 

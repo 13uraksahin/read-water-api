@@ -39,7 +39,7 @@ CREATE TYPE "ConnectionType" AS ENUM ('THREAD', 'FLANGE');
 CREATE TYPE "CommunicationModule" AS ENUM ('INTEGRATED', 'RETROFIT', 'NONE');
 
 -- CreateEnum
-CREATE TYPE "Brand" AS ENUM ('BAYLAN', 'MANAS', 'KLEPSAN', 'CEM', 'ZENNER', 'TURKOGLU', 'BEREKET', 'TEKSAN');
+CREATE TYPE "Brand" AS ENUM ('BAYLAN', 'MANAS', 'KLEPSAN', 'CEM', 'ZENNER', 'TURKOGLU', 'BEREKET', 'TEKSAN', 'ITRON', 'IMA', 'CODIGNO');
 
 -- CreateEnum
 CREATE TYPE "CommunicationTechnology" AS ENUM ('SIGFOX', 'LORAWAN', 'NB_IOT', 'WM_BUS', 'MIOTY', 'WIFI', 'BLUETOOTH', 'NFC', 'OMS');
@@ -54,7 +54,7 @@ CREATE TYPE "ConsumptionType" AS ENUM ('NORMAL', 'HIGH');
 CREATE TYPE "CustomerType" AS ENUM ('INDIVIDUAL', 'ORGANIZATIONAL');
 
 -- CreateEnum
-CREATE TYPE "MeterStatus" AS ENUM ('ACTIVE', 'PASSIVE', 'WAREHOUSE', 'MAINTENANCE', 'PLANNED', 'DEPLOYED');
+CREATE TYPE "MeterStatus" AS ENUM ('ACTIVE', 'PASSIVE', 'WAREHOUSE', 'MAINTENANCE', 'PLANNED', 'DEPLOYED', 'USED');
 
 -- CreateEnum
 CREATE TYPE "IPRating" AS ENUM ('IP54', 'IP65', 'IP67', 'IP68');
@@ -73,6 +73,12 @@ CREATE TYPE "SubscriptionStatus" AS ENUM ('ACTIVE', 'PASSIVE', 'TRIAL', 'SUSPEND
 
 -- CreateEnum
 CREATE TYPE "ValveStatus" AS ENUM ('OPEN', 'CLOSED', 'UNKNOWN', 'NOT_APPLICABLE');
+
+-- CreateEnum
+CREATE TYPE "DeviceBrand" AS ENUM ('UNA', 'IMA', 'ITRON', 'ZENNER', 'MANAS', 'BAYLAN', 'CEM', 'KLEPSAN', 'CODIGNO', 'INODYA');
+
+-- CreateEnum
+CREATE TYPE "DeviceStatus" AS ENUM ('ACTIVE', 'PASSIVE', 'WAREHOUSE', 'MAINTENANCE', 'PLANNED', 'DEPLOYED', 'USED');
 
 -- CreateTable
 CREATE TABLE "tenants" (
@@ -198,6 +204,27 @@ CREATE TABLE "meter_profiles" (
 );
 
 -- CreateTable
+CREATE TABLE "device_profiles" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "brand" "DeviceBrand" NOT NULL,
+    "model_code" TEXT NOT NULL,
+    "communication_technology" "CommunicationTechnology" NOT NULL,
+    "integration_type" "IntegrationType" NOT NULL DEFAULT 'HTTP',
+    "field_definitions" JSONB NOT NULL DEFAULT '[]',
+    "decoder_function" TEXT,
+    "test_payload" TEXT,
+    "expected_output" JSONB,
+    "last_tested_at" TIMESTAMP(3),
+    "last_test_succeeded" BOOLEAN,
+    "battery_life_months" INTEGER,
+    "specifications" JSONB,
+
+    CONSTRAINT "device_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "meters" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -205,6 +232,7 @@ CREATE TABLE "meters" (
     "tenant_id" UUID NOT NULL,
     "customer_id" UUID,
     "meter_profile_id" UUID NOT NULL,
+    "active_device_id" UUID,
     "serial_number" TEXT NOT NULL,
     "initial_index" DECIMAL(15,3) NOT NULL DEFAULT 0,
     "installation_date" TIMESTAMP(3) NOT NULL,
@@ -222,6 +250,24 @@ CREATE TABLE "meters" (
     "metadata" JSONB,
 
     CONSTRAINT "meters_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "devices" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "tenant_id" UUID NOT NULL,
+    "device_profile_id" UUID NOT NULL,
+    "serial_number" TEXT NOT NULL,
+    "status" "DeviceStatus" NOT NULL DEFAULT 'WAREHOUSE',
+    "dynamic_fields" JSONB NOT NULL DEFAULT '{}',
+    "last_signal_strength" INTEGER,
+    "last_battery_level" INTEGER,
+    "last_communication_at" TIMESTAMP(3),
+    "metadata" JSONB,
+
+    CONSTRAINT "devices_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable: Readings (Will be converted to TimescaleDB hypertable)
@@ -334,6 +380,14 @@ CREATE TABLE "_TenantAllowedProfiles" (
     CONSTRAINT "_TenantAllowedProfiles_AB_pkey" PRIMARY KEY ("A","B")
 );
 
+-- CreateTable: Many-to-Many for Compatible Device Profiles
+CREATE TABLE "_CompatibleDeviceProfiles" (
+    "A" UUID NOT NULL,
+    "B" UUID NOT NULL,
+
+    CONSTRAINT "_CompatibleDeviceProfiles_AB_pkey" PRIMARY KEY ("A","B")
+);
+
 -- =============================================================================
 -- TIMESCALEDB HYPERTABLE
 -- =============================================================================
@@ -423,7 +477,19 @@ CREATE INDEX "meter_profiles_meter_type_idx" ON "meter_profiles"("meter_type");
 CREATE UNIQUE INDEX "meter_profiles_brand_model_code_key" ON "meter_profiles"("brand", "model_code");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "device_profiles_brand_model_code_key" ON "device_profiles"("brand", "model_code");
+
+-- CreateIndex
+CREATE INDEX "device_profiles_brand_idx" ON "device_profiles"("brand");
+
+-- CreateIndex
+CREATE INDEX "device_profiles_communication_technology_idx" ON "device_profiles"("communication_technology");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "meters_serial_number_key" ON "meters"("serial_number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "meters_active_device_id_key" ON "meters"("active_device_id");
 
 -- CreateIndex
 CREATE INDEX "meters_tenant_id_idx" ON "meters"("tenant_id");
@@ -438,7 +504,7 @@ CREATE INDEX "meters_status_idx" ON "meters"("status");
 CREATE INDEX "meters_serial_number_idx" ON "meters"("serial_number");
 
 -- CreateIndex: Time-based indexes for readings (optimized for TimescaleDB)
-CREATE INDEX "readings_time_idx" ON "readings"("time" DESC);
+-- Note: readings_time_idx is auto-created by TimescaleDB when creating the hypertable
 
 -- CreateIndex
 CREATE INDEX "readings_meter_id_time_idx" ON "readings"("meter_id", "time" DESC);
@@ -485,6 +551,24 @@ CREATE INDEX "refresh_tokens_token_idx" ON "refresh_tokens"("token");
 -- CreateIndex
 CREATE INDEX "_TenantAllowedProfiles_B_index" ON "_TenantAllowedProfiles"("B");
 
+-- CreateIndex
+CREATE INDEX "_CompatibleDeviceProfiles_B_index" ON "_CompatibleDeviceProfiles"("B");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "devices_serial_number_key" ON "devices"("serial_number");
+
+-- CreateIndex
+CREATE INDEX "devices_tenant_id_idx" ON "devices"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX "devices_device_profile_id_idx" ON "devices"("device_profile_id");
+
+-- CreateIndex
+CREATE INDEX "devices_status_idx" ON "devices"("status");
+
+-- CreateIndex
+CREATE INDEX "devices_serial_number_idx" ON "devices"("serial_number");
+
 -- =============================================================================
 -- FOREIGN KEYS
 -- =============================================================================
@@ -527,6 +611,21 @@ ALTER TABLE "_TenantAllowedProfiles" ADD CONSTRAINT "_TenantAllowedProfiles_A_fk
 
 -- AddForeignKey
 ALTER TABLE "_TenantAllowedProfiles" ADD CONSTRAINT "_TenantAllowedProfiles_B_fkey" FOREIGN KEY ("B") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_CompatibleDeviceProfiles" ADD CONSTRAINT "_CompatibleDeviceProfiles_A_fkey" FOREIGN KEY ("A") REFERENCES "device_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_CompatibleDeviceProfiles" ADD CONSTRAINT "_CompatibleDeviceProfiles_B_fkey" FOREIGN KEY ("B") REFERENCES "meter_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "devices" ADD CONSTRAINT "devices_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "devices" ADD CONSTRAINT "devices_device_profile_id_fkey" FOREIGN KEY ("device_profile_id") REFERENCES "device_profiles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "meters" ADD CONSTRAINT "meters_active_device_id_fkey" FOREIGN KEY ("active_device_id") REFERENCES "devices"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- =============================================================================
 -- HELPER FUNCTIONS FOR LTREE QUERIES

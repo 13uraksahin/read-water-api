@@ -46,17 +46,51 @@ export class DeviceProfilesService {
       );
     }
 
+    // Handle communicationConfigs - store in specifications and derive primary values
+    let communicationTechnology = dto.communicationTechnology;
+    let fieldDefinitions = dto.fieldDefinitions || [];
+    let decoderFunction = dto.decoderFunction;
+    let testPayload = dto.testPayload;
+    let specifications: any = {};
+
+    if (dto.communicationConfigs && dto.communicationConfigs.length > 0) {
+      // Store all communication configs in specifications
+      specifications.communicationConfigs = dto.communicationConfigs;
+      
+      // Use first config as primary for backward compatibility
+      const primaryConfig = dto.communicationConfigs[0];
+      communicationTechnology = primaryConfig.technology;
+      
+      // Merge all field definitions from all technologies
+      fieldDefinitions = dto.communicationConfigs.flatMap(config => 
+        config.fieldDefinitions.map(fd => ({
+          ...fd,
+          // Add technology prefix to field name for uniqueness if multiple techs
+          technology: config.technology,
+        }))
+      );
+      
+      // Use primary decoder if not explicitly set
+      if (!decoderFunction && primaryConfig.decoderFunction) {
+        decoderFunction = primaryConfig.decoderFunction;
+      }
+      if (!testPayload && primaryConfig.testPayload) {
+        testPayload = primaryConfig.testPayload;
+      }
+    }
+
     const profile = await this.prisma.deviceProfile.create({
       data: {
         brand: dto.brand,
         modelCode: dto.modelCode,
-        communicationTechnology: dto.communicationTechnology,
+        communicationTechnology: communicationTechnology!,
         integrationType: dto.integrationType || 'HTTP',
-        fieldDefinitions: (dto.fieldDefinitions || []) as any,
-        decoderFunction: dto.decoderFunction,
-        testPayload: dto.testPayload,
+        fieldDefinitions: fieldDefinitions as any,
+        decoderFunction,
+        testPayload,
         expectedOutput: dto.expectedOutput as any,
         batteryLifeMonths: dto.batteryLifeMonths,
+        specifications: Object.keys(specifications).length > 0 ? specifications : undefined,
         // Connect compatible meter profiles if provided
         compatibleMeterProfiles: dto.compatibleMeterProfileIds
           ? {
@@ -177,19 +211,52 @@ export class DeviceProfilesService {
    * Update device profile
    */
   async update(id: string, dto: UpdateDeviceProfileDto): Promise<DeviceProfile> {
-    await this.findOne(id);
+    const existingProfile = await this.findOne(id);
+
+    // Handle communicationConfigs update
+    let communicationTechnology = dto.communicationTechnology;
+    let fieldDefinitions = dto.fieldDefinitions;
+    let decoderFunction = dto.decoderFunction;
+    let testPayload = dto.testPayload;
+    let specifications: any = (existingProfile.specifications as any) || {};
+
+    if (dto.communicationConfigs && dto.communicationConfigs.length > 0) {
+      // Store all communication configs in specifications
+      specifications.communicationConfigs = dto.communicationConfigs;
+      
+      // Use first config as primary for backward compatibility
+      const primaryConfig = dto.communicationConfigs[0];
+      communicationTechnology = primaryConfig.technology;
+      
+      // Merge all field definitions from all technologies
+      fieldDefinitions = dto.communicationConfigs.flatMap(config => 
+        config.fieldDefinitions.map(fd => ({
+          ...fd,
+          technology: config.technology,
+        }))
+      );
+      
+      // Use primary decoder if not explicitly set
+      if (decoderFunction === undefined && primaryConfig.decoderFunction) {
+        decoderFunction = primaryConfig.decoderFunction;
+      }
+      if (testPayload === undefined && primaryConfig.testPayload) {
+        testPayload = primaryConfig.testPayload;
+      }
+    }
 
     const updated = await this.prisma.deviceProfile.update({
       where: { id },
       data: {
         modelCode: dto.modelCode,
-        communicationTechnology: dto.communicationTechnology,
+        communicationTechnology,
         integrationType: dto.integrationType,
-        fieldDefinitions: dto.fieldDefinitions as any,
-        decoderFunction: dto.decoderFunction,
-        testPayload: dto.testPayload,
+        fieldDefinitions: fieldDefinitions as any,
+        decoderFunction,
+        testPayload,
         expectedOutput: dto.expectedOutput as any,
         batteryLifeMonths: dto.batteryLifeMonths,
+        specifications: Object.keys(specifications).length > 0 ? specifications : undefined,
         // Update compatible meter profiles if provided
         compatibleMeterProfiles: dto.compatibleMeterProfileIds
           ? {

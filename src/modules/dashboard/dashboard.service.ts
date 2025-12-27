@@ -1,8 +1,8 @@
 // =============================================================================
-// Dashboard Service
+// Dashboard Service - Updated for Subscription Model
 // =============================================================================
 // Provides real-time dashboard statistics, map data, alarms, and consumption
-// charts by querying the actual database (Asset/Device separation architecture)
+// Address/location is now on Subscription, not Meter
 // CRITICAL: All queries are filtered by user's tenant hierarchy
 // =============================================================================
 
@@ -19,6 +19,7 @@ import { SYSTEM_ROLES } from '../../common/constants';
 export interface DashboardStats {
   totalMeters: number;
   totalCustomers: number;
+  totalSubscriptions: number;
   totalReadings: number;
   totalWaterUsage: number;
   activeAlarms: number;
@@ -37,12 +38,13 @@ export interface MeterMapData {
   latitude: number;
   longitude: number;
   status: MeterStatus;
-  mapStatus: MeterMapStatus; // Computed color status
+  mapStatus: MeterMapStatus;
   hasAlarm: boolean;
   isHighUsage: boolean;
   isOffline: boolean;
   serialNumber: string;
   customerName: string | null;
+  address: Record<string, unknown> | null;
   // Device info (from joined activeDevice)
   batteryLevel: number | null;
   signalStrength: number | null;
@@ -61,9 +63,9 @@ export interface DashboardAlarm {
 }
 
 export interface ConsumptionDataPoint {
-  date: string; // ISO date string (YYYY-MM-DD)
-  timestamp: number; // Unix timestamp in ms for charts
-  consumption: number; // Total consumption for that day
+  date: string;
+  timestamp: number;
+  consumption: number;
 }
 
 // =============================================================================
@@ -78,8 +80,6 @@ export class DashboardService {
 
   /**
    * Build tenant filter based on user's access and selected tenant
-   * CRITICAL: Uses tenant path hierarchy for proper filtering
-   * @param tenantPath - The tenant path to filter by (either user's or selected tenant's)
    */
   private buildTenantFilterByPath(tenantPath: string): Record<string, any> {
     return {
@@ -93,37 +93,58 @@ export class DashboardService {
 
   /**
    * Get the effective tenant path for filtering
-   * - If tenantId is provided, use that tenant's path (after access check)
-   * - Otherwise, use user's tenant path
-   * - Platform admin with no filter sees everything
+   */
+  /**
+   * Get the effective tenant path for filtering
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
    */
   private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
-    // If specific tenant selected, look up its path
+    // Platform admin can see everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      if (tenantId) {
+        const selectedTenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { path: true },
+        });
+        return selectedTenant?.path || null;
+      }
+      return null;
+    }
+
     if (tenantId) {
+      // Check if user has direct assignment to the requested tenant
+      const userTenantAssignment = await this.prisma.userTenant.findFirst({
+        where: {
+          userId: user.id,
+          tenantId: tenantId,
+        },
+        include: {
+          tenant: {
+            select: { path: true },
+          },
+        },
+      });
+
+      if (userTenantAssignment) {
+        // User has direct assignment to this tenant - allow access
+        return userTenantAssignment.tenant.path;
+      }
+
+      // Check hierarchical access (user's tenant path contains selected tenant)
       const selectedTenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { path: true },
       });
 
-      if (!selectedTenant) {
-        return user.tenantPath; // Fallback to user's tenant
+      if (selectedTenant && selectedTenant.path.startsWith(user.tenantPath)) {
+        return selectedTenant.path;
       }
 
-      // For non-admin users, verify they have access to the selected tenant
-      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-        if (!selectedTenant.path.startsWith(user.tenantPath)) {
-          return user.tenantPath; // No access, fallback to user's tenant
-        }
-      }
-
-      return selectedTenant.path;
+      // No access to requested tenant - fall back to user's primary tenant
+      return user.tenantPath;
     }
 
-    // No tenant selected - Platform admin sees all, others see their hierarchy
-    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
-      return null; // No filter for platform admin without tenant selection
-    }
-
+    // No tenantId specified - use user's primary tenant path
     return user.tenantPath;
   }
 
@@ -135,10 +156,10 @@ export class DashboardService {
     const effectivePath = await this.getEffectiveTenantPath(user, tenantId);
     const tenantFilter = effectivePath ? this.buildTenantFilterByPath(effectivePath) : {};
 
-    // Run all queries in parallel for better performance
     const [
       totalMeters,
       totalCustomers,
+      totalSubscriptions,
       readingsStats,
       activeAlarms,
       metersInMaintenance,
@@ -147,69 +168,34 @@ export class DashboardService {
       devicesInWarehouse,
       devicesDeployed,
     ] = await Promise.all([
-      // Total meters count
-      this.prisma.meter.count({
-        where: tenantFilter,
-      }),
-
-      // Total customers count
-      this.prisma.customer.count({
-        where: tenantFilter,
-      }),
-
-      // Total readings and water usage (aggregate)
+      this.prisma.meter.count({ where: tenantFilter }),
+      this.prisma.customer.count({ where: tenantFilter }),
+      this.prisma.subscription.count({ where: tenantFilter }),
       this.prisma.reading.aggregate({
         where: tenantFilter,
-        _count: {
-          id: true,
-        },
-        _sum: {
-          consumption: true,
-        },
+        _count: { id: true },
+        _sum: { consumption: true },
       }),
-
-      // Active alarms count
       this.prisma.alarm.count({
-        where: {
-          ...tenantFilter,
-          status: 'ACTIVE',
-        },
+        where: { ...tenantFilter, status: 'ACTIVE' },
       }),
-
-      // Meters in maintenance
       this.prisma.meter.count({
-        where: {
-          ...tenantFilter,
-          status: 'MAINTENANCE',
-        },
+        where: { ...tenantFilter, status: 'MAINTENANCE' },
       }),
-
-      // Meters offline (no reading in last 24 hours)
       this.getOfflineMetersCount(effectivePath),
-
-      // Device stats
+      this.prisma.device.count({ where: tenantFilter }),
       this.prisma.device.count({
-        where: tenantFilter,
+        where: { ...tenantFilter, status: DeviceStatus.WAREHOUSE },
       }),
-
       this.prisma.device.count({
-        where: {
-          ...tenantFilter,
-          status: DeviceStatus.WAREHOUSE,
-        },
-      }),
-
-      this.prisma.device.count({
-        where: {
-          ...tenantFilter,
-          status: DeviceStatus.DEPLOYED,
-        },
+        where: { ...tenantFilter, status: DeviceStatus.DEPLOYED },
       }),
     ]);
 
     return {
       totalMeters,
       totalCustomers,
+      totalSubscriptions,
       totalReadings: readingsStats._count.id || 0,
       totalWaterUsage: Number(readingsStats._sum.consumption || 0),
       activeAlarms,
@@ -222,7 +208,8 @@ export class DashboardService {
   }
 
   // ===========================================================================
-  // GET MAP DATA - Fetch meters with location and device info
+  // GET MAP DATA - Fetch subscriptions with location and meter info
+  // Now uses Subscription.latitude/longitude instead of Meter
   // ===========================================================================
 
   async getMapData(user: AuthenticatedUser, tenantId?: string): Promise<MeterMapData[]> {
@@ -231,106 +218,110 @@ export class DashboardService {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     try {
-      // Fetch meters with location, customer, device, and alarm info
-      const meters = await this.prisma.meter.findMany({
+      // Fetch subscriptions with location and related meter/device info
+      const subscriptions = await this.prisma.subscription.findMany({
         where: {
           ...tenantFilter,
-          // Only meters with valid coordinates
           latitude: { not: null },
           longitude: { not: null },
+          isActive: true,
         },
         select: {
           id: true,
-          serialNumber: true,
-          status: true,
           latitude: true,
           longitude: true,
-          lastReadingTime: true,
-          // Customer relation for name
+          address: true,
           customer: {
             select: {
               customerType: true,
               details: true,
             },
           },
-          // CRITICAL JOIN: Include activeDevice for battery/signal status
-          activeDevice: {
+          meters: {
+            where: { status: MeterStatus.ACTIVE },
             select: {
+              id: true,
+              serialNumber: true,
               status: true,
-              lastBatteryLevel: true,
-              lastSignalStrength: true,
-              lastCommunicationAt: true,
+              lastReadingTime: true,
+              activeDevice: {
+                select: {
+                  status: true,
+                  lastBatteryLevel: true,
+                  lastSignalStrength: true,
+                  lastCommunicationAt: true,
+                },
+              },
+              alarms: {
+                where: { status: 'ACTIVE' },
+                select: { type: true },
+              },
+              readings: {
+                where: { time: { gte: twentyFourHoursAgo } },
+                take: 1,
+                select: { id: true },
+              },
             },
-          },
-          // Active alarms on this meter
-          alarms: {
-            where: {
-              status: 'ACTIVE',
-            },
-            select: {
-              type: true,
-            },
-          },
-          // Check for recent readings to determine offline status
-          readings: {
-            where: {
-              time: { gte: twentyFourHoursAgo },
-            },
-            take: 1,
-            select: { id: true },
           },
         },
       });
 
-      // Get high-usage threshold (could be from settings)
-      const highUsageThreshold = 100; // m³/day - configurable
+      // Get high-usage threshold
+      const highUsageThreshold = 100;
 
       // Check which meters have high usage in last 24h
-      const highUsageMeters = await this.getHighUsageMeters(
-        effectivePath,
-        highUsageThreshold,
-      );
+      const highUsageMeters = await this.getHighUsageMeters(effectivePath, highUsageThreshold);
       const highUsageMeterIds = new Set(highUsageMeters.map((m) => m.meterId));
 
       // Transform to map data
-      return meters.map((meter) => {
-        const hasAlarm = meter.alarms.length > 0;
-        const isOffline = this.isOffline(meter);
-        const isHighUsage = highUsageMeterIds.has(meter.id);
+      const mapData: MeterMapData[] = [];
 
-        // Determine map status color priority: alarm > offline > high_usage > normal
-        let mapStatus: MeterMapStatus = 'normal';
-        if (hasAlarm) {
-          mapStatus = 'alarm';
-        } else if (isOffline) {
-          mapStatus = 'offline';
-        } else if (isHighUsage) {
-          mapStatus = 'high_usage';
+      for (const subscription of subscriptions) {
+        // Show one point per active meter in the subscription
+        for (const meter of subscription.meters) {
+          const hasAlarm = meter.alarms.length > 0;
+          const isOffline = this.isOffline({
+            status: meter.status,
+            lastReadingTime: meter.lastReadingTime,
+            readings: meter.readings,
+            activeDevice: meter.activeDevice,
+          });
+          const isHighUsage = highUsageMeterIds.has(meter.id);
+
+          let mapStatus: MeterMapStatus = 'normal';
+          if (hasAlarm) {
+            mapStatus = 'alarm';
+          } else if (isOffline) {
+            mapStatus = 'offline';
+          } else if (isHighUsage) {
+            mapStatus = 'high_usage';
+          }
+
+          const customerName = this.extractCustomerName(
+            subscription.customer?.customerType,
+            subscription.customer?.details as Record<string, string> | null,
+          );
+
+          mapData.push({
+            id: meter.id,
+            latitude: Number(subscription.latitude),
+            longitude: Number(subscription.longitude),
+            status: meter.status,
+            mapStatus,
+            hasAlarm,
+            isHighUsage,
+            isOffline,
+            serialNumber: meter.serialNumber,
+            customerName,
+            address: subscription.address as Record<string, unknown> | null,
+            batteryLevel: meter.activeDevice?.lastBatteryLevel ?? null,
+            signalStrength: meter.activeDevice?.lastSignalStrength ?? null,
+            lastCommunicationAt: meter.activeDevice?.lastCommunicationAt?.toISOString() ?? null,
+          });
         }
+      }
 
-        // Extract customer name from dynamic details
-        const customerName = this.extractCustomerName(
-          meter.customer?.customerType,
-          meter.customer?.details as Record<string, string> | null,
-        );
-
-        return {
-          id: meter.id,
-          latitude: Number(meter.latitude),
-          longitude: Number(meter.longitude),
-          status: meter.status,
-          mapStatus,
-          hasAlarm,
-          isHighUsage,
-          isOffline,
-          serialNumber: meter.serialNumber,
-          customerName,
-          batteryLevel: meter.activeDevice?.lastBatteryLevel ?? null,
-          signalStrength: meter.activeDevice?.lastSignalStrength ?? null,
-          lastCommunicationAt:
-            meter.activeDevice?.lastCommunicationAt?.toISOString() ?? null,
-        };
-      });
+      return mapData;
     } catch (error) {
       this.logger.error('Failed to get map data', error);
       return [];
@@ -357,10 +348,14 @@ export class DashboardService {
           meter: {
             select: {
               serialNumber: true,
-              customer: {
+              subscription: {
                 select: {
-                  customerType: true,
-                  details: true,
+                  customer: {
+                    select: {
+                      customerType: true,
+                      details: true,
+                    },
+                  },
                 },
               },
             },
@@ -377,8 +372,8 @@ export class DashboardService {
         createdAt: alarm.createdAt,
         meterSerial: alarm.meter.serialNumber,
         customerName: this.extractCustomerName(
-          alarm.meter.customer?.customerType,
-          alarm.meter.customer?.details as Record<string, string> | null,
+          alarm.meter.subscription?.customer?.customerType,
+          alarm.meter.subscription?.customer?.details as Record<string, string> | null,
         ),
       }));
     } catch (error) {
@@ -403,24 +398,16 @@ export class DashboardService {
       startDate.setDate(startDate.getDate() - days);
       startDate.setHours(0, 0, 0, 0);
       
-      // Get tenant IDs based on effective path
       let tenantIds: string[] = [];
       
       if (effectivePath) {
-        // Get all tenants within the hierarchy
         const accessibleTenants = await this.prisma.tenant.findMany({
-          where: {
-            path: {
-              startsWith: effectivePath,
-            },
-          },
+          where: { path: { startsWith: effectivePath } },
           select: { id: true },
         });
         tenantIds = accessibleTenants.map(t => t.id);
       }
 
-      // Use raw SQL for TimescaleDB time_bucket aggregation
-      // This is more efficient than Prisma for time-series data
       let result: { bucket: Date; total_consumption: bigint | number | null }[];
       
       if (tenantIds.length > 0) {
@@ -436,7 +423,6 @@ export class DashboardService {
           ORDER BY bucket ASC
         `;
       } else {
-        // No path filter (platform admin with no tenant selected) - show all
         result = await this.prisma.$queryRaw`
           SELECT 
             time_bucket('1 day', time) AS bucket,
@@ -448,7 +434,6 @@ export class DashboardService {
         `;
       }
 
-      // Transform to ConsumptionDataPoint array
       return result.map((row) => {
         const date = new Date(row.bucket);
         return {
@@ -459,8 +444,6 @@ export class DashboardService {
       });
     } catch (error) {
       this.logger.error('Failed to get consumption chart data', error);
-
-      // Fallback: Try simple Prisma aggregation if raw query fails
       return this.getConsumptionChartFallback(effectivePath, days);
     }
   }
@@ -469,9 +452,6 @@ export class DashboardService {
   // Private Helper Methods
   // ===========================================================================
 
-  /**
-   * Check if a meter is offline (no recent reading or no device communication)
-   */
   private isOffline(meter: {
     status: MeterStatus;
     lastReadingTime: Date | null;
@@ -481,20 +461,16 @@ export class DashboardService {
       lastCommunicationAt: Date | null;
     } | null;
   }): boolean {
-    // Meter not active = not considered offline
     if (meter.status !== 'ACTIVE') return false;
 
-    // No device attached and no recent readings
     if (!meter.activeDevice) {
       return meter.readings.length === 0;
     }
 
-    // Device is not deployed
     if (meter.activeDevice.status !== 'DEPLOYED') {
       return true;
     }
 
-    // No communication in 24h
     if (!meter.activeDevice.lastCommunicationAt) {
       return meter.readings.length === 0;
     }
@@ -506,27 +482,19 @@ export class DashboardService {
     );
   }
 
-  /**
-   * Get count of offline meters
-   */
   private async getOfflineMetersCount(tenantPath: string | null): Promise<number> {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const tenantFilter = tenantPath ? this.buildTenantFilterByPath(tenantPath) : {};
 
     try {
       const activeMeters = await this.prisma.meter.findMany({
-        where: {
-          status: 'ACTIVE',
-          ...tenantFilter,
-        },
+        where: { status: 'ACTIVE', ...tenantFilter },
         select: {
           id: true,
           status: true,
           lastReadingTime: true,
           readings: {
-            where: {
-              time: { gte: twentyFourHoursAgo },
-            },
+            where: { time: { gte: twentyFourHoursAgo } },
             take: 1,
             select: { id: true },
           },
@@ -553,9 +521,6 @@ export class DashboardService {
     }
   }
 
-  /**
-   * Get meters with high usage in last 24h
-   */
   private async getHighUsageMeters(
     tenantPath: string | null,
     thresholdM3: number,
@@ -566,19 +531,10 @@ export class DashboardService {
     try {
       const result = await this.prisma.reading.groupBy({
         by: ['meterId'],
-        where: {
-          time: { gte: twentyFourHoursAgo },
-          ...tenantFilter,
-        },
-        _sum: {
-          consumption: true,
-        },
+        where: { time: { gte: twentyFourHoursAgo }, ...tenantFilter },
+        _sum: { consumption: true },
         having: {
-          consumption: {
-            _sum: {
-              gte: thresholdM3,
-            },
-          },
+          consumption: { _sum: { gte: thresholdM3 } },
         },
       });
 
@@ -592,9 +548,6 @@ export class DashboardService {
     }
   }
 
-  /**
-   * Extract customer name from dynamic details
-   */
   private extractCustomerName(
     customerType: string | undefined,
     details: Record<string, string> | null,
@@ -612,9 +565,6 @@ export class DashboardService {
     return null;
   }
 
-  /**
-   * Fallback consumption chart using Prisma (if raw SQL fails)
-   */
   private async getConsumptionChartFallback(
     tenantPath: string | null,
     days: number,
@@ -625,20 +575,12 @@ export class DashboardService {
     const tenantFilter = tenantPath ? this.buildTenantFilterByPath(tenantPath) : {};
 
     try {
-      // Get all readings in range
       const readings = await this.prisma.reading.findMany({
-        where: {
-          time: { gte: startDate },
-          ...tenantFilter,
-        },
-        select: {
-          time: true,
-          consumption: true,
-        },
+        where: { time: { gte: startDate }, ...tenantFilter },
+        select: { time: true, consumption: true },
         orderBy: { time: 'asc' },
       });
 
-      // Group by day manually
       const dailyMap = new Map<string, number>();
 
       for (const reading of readings) {
@@ -647,7 +589,6 @@ export class DashboardService {
         dailyMap.set(dateKey, current + Number(reading.consumption));
       }
 
-      // Convert to array
       return Array.from(dailyMap.entries())
         .map(([date, consumption]) => ({
           date,

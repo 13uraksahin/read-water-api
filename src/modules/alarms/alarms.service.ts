@@ -1,5 +1,7 @@
 // =============================================================================
-// Alarms Service
+// Alarms Service - Updated for Subscription Model
+// =============================================================================
+// Address/location is now on Subscription, not Meter
 // =============================================================================
 
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -24,6 +26,7 @@ export interface AlarmData {
   meter?: {
     id: string;
     serialNumber: string;
+    // Location now comes from subscription
     latitude: number | null;
     longitude: number | null;
     address: Record<string, unknown> | null;
@@ -102,9 +105,14 @@ export class AlarmsService {
             select: {
               id: true,
               serialNumber: true,
-              latitude: true,
-              longitude: true,
-              address: true,
+              // Address/location now comes from subscription
+              subscription: {
+                select: {
+                  latitude: true,
+                  longitude: true,
+                  address: true,
+                },
+              },
             },
           },
           tenant: {
@@ -141,9 +149,13 @@ export class AlarmsService {
           select: {
             id: true,
             serialNumber: true,
-            latitude: true,
-            longitude: true,
-            address: true,
+            subscription: {
+              select: {
+                latitude: true,
+                longitude: true,
+                address: true,
+              },
+            },
           },
         },
         tenant: {
@@ -183,9 +195,13 @@ export class AlarmsService {
           select: {
             id: true,
             serialNumber: true,
-            latitude: true,
-            longitude: true,
-            address: true,
+            subscription: {
+              select: {
+                latitude: true,
+                longitude: true,
+                address: true,
+              },
+            },
           },
         },
         tenant: {
@@ -222,9 +238,13 @@ export class AlarmsService {
           select: {
             id: true,
             serialNumber: true,
-            latitude: true,
-            longitude: true,
-            address: true,
+            subscription: {
+              select: {
+                latitude: true,
+                longitude: true,
+                address: true,
+              },
+            },
           },
         },
         tenant: {
@@ -240,6 +260,9 @@ export class AlarmsService {
   }
 
   private mapAlarm(alarm: any): AlarmData {
+    // Extract location/address from subscription
+    const subscription = alarm.meter?.subscription;
+    
     return {
       id: alarm.id,
       createdAt: alarm.createdAt,
@@ -260,9 +283,10 @@ export class AlarmsService {
         ? {
             id: alarm.meter.id,
             serialNumber: alarm.meter.serialNumber,
-            latitude: alarm.meter.latitude ? Number(alarm.meter.latitude) : null,
-            longitude: alarm.meter.longitude ? Number(alarm.meter.longitude) : null,
-            address: alarm.meter.address as Record<string, unknown> | null,
+            // Location from subscription
+            latitude: subscription?.latitude ? Number(subscription.latitude) : null,
+            longitude: subscription?.longitude ? Number(subscription.longitude) : null,
+            address: subscription?.address as Record<string, unknown> | null,
           }
         : undefined,
       tenant: alarm.tenant

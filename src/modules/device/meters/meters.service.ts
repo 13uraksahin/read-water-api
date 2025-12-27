@@ -1,8 +1,8 @@
 // =============================================================================
-// Meters Service - Refactored for Asset/Device Split
+// Meters Service - Updated for Subscription Model
 // =============================================================================
-// REMOVED: All connectivity_config validation and processing
-// Meters are now pure assets - connectivity is handled by Device entity
+// Meters are linked to Subscriptions, not directly to Customers
+// Address is inherited from Subscription
 // =============================================================================
 
 import {
@@ -22,10 +22,11 @@ import {
   ControlValveDto,
   LinkDeviceDto,
   UnlinkDeviceDto,
+  LinkSubscriptionDto,
 } from './dto/meter.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../../common/interfaces';
 import { PAGINATION, SYSTEM_ROLES } from '../../../common/constants';
-import { Meter, ValveStatus, DeviceStatus } from '@prisma/client';
+import { Meter, ValveStatus, DeviceStatus, MeterStatus } from '@prisma/client';
 
 @Injectable()
 export class MetersService {
@@ -37,7 +38,33 @@ export class MetersService {
   ) {}
 
   /**
-   * Create a new meter (pure asset, no connectivity config)
+   * Check if user has access to a specific tenant
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
+   */
+  private async hasUserAccessToTenant(user: AuthenticatedUser, tenantPath: string, tenantId: string): Promise<boolean> {
+    // Platform admin can access everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      return true;
+    }
+
+    // Check hierarchical access (tenant is descendant or ancestor)
+    if (tenantPath.startsWith(user.tenantPath) || user.tenantPath.startsWith(tenantPath)) {
+      return true;
+    }
+
+    // Check for direct tenant assignment
+    const directAssignment = await this.prisma.userTenant.findFirst({
+      where: {
+        userId: user.id,
+        tenantId: tenantId,
+      },
+    });
+
+    return !!directAssignment;
+  }
+
+  /**
+   * Create a new meter (linked to subscription, not customer)
    */
   async create(dto: CreateMeterDto, user: AuthenticatedUser): Promise<Meter> {
     // Verify tenant access
@@ -49,20 +76,15 @@ export class MetersService {
       throw new NotFoundException('Tenant not found');
     }
 
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
+    // Check tenant access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, tenant.path, tenant.id);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this tenant');
     }
 
-    // Verify meter profile exists and tenant has access
+    // Verify meter profile exists
     const profile = await this.prisma.meterProfile.findUnique({
       where: { id: dto.meterProfileId },
-      include: {
-        allowedTenants: {
-          where: { id: dto.tenantId },
-        },
-      },
     });
 
     if (!profile) {
@@ -78,39 +100,41 @@ export class MetersService {
       throw new BadRequestException(`Meter with serial number ${dto.serialNumber} already exists`);
     }
 
-    // STRICT: Verify customer exists and belongs to tenant
-    const customer = await this.prisma.customer.findFirst({
-      where: {
-        id: dto.customerId,
-        tenantId: dto.tenantId,
-      },
-    });
+    // If subscription is provided, verify it exists and belongs to tenant
+    if (dto.subscriptionId) {
+      const subscription = await this.prisma.subscription.findFirst({
+        where: {
+          id: dto.subscriptionId,
+          tenantId: dto.tenantId,
+        },
+      });
 
-    if (!customer) {
-      throw new NotFoundException('Customer not found or does not belong to this tenant');
+      if (!subscription) {
+        throw new NotFoundException('Subscription not found or does not belong to this tenant');
+      }
     }
 
     const meter = await this.prisma.meter.create({
       data: {
         tenantId: dto.tenantId,
-        customerId: dto.customerId,
+        subscriptionId: dto.subscriptionId || null,
         meterProfileId: dto.meterProfileId,
         serialNumber: dto.serialNumber,
         initialIndex: dto.initialIndex || 0,
         installationDate: new Date(dto.installationDate),
-        status: dto.status || 'WAREHOUSE',
-        address: dto.address as any,
-        addressCode: dto.addressCode,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
+        status: dto.status || MeterStatus.WAREHOUSE,
         metadata: dto.metadata as any,
       },
       include: {
         tenant: {
           select: { id: true, name: true, path: true },
         },
-        customer: {
-          select: { id: true, details: true },
+        subscription: {
+          include: {
+            customer: {
+              select: { id: true, details: true, customerType: true },
+            },
+          },
         },
         meterProfile: {
           select: { id: true, brand: true, modelCode: true, meterType: true },
@@ -128,33 +152,57 @@ export class MetersService {
   /**
    * Get the effective tenant path for filtering
    */
+  /**
+   * Get the effective tenant path for filtering
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
+   */
   private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
-    // If specific tenant selected, look up its path
+    // Platform admin can see everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      if (tenantId) {
+        const selectedTenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { path: true },
+        });
+        return selectedTenant?.path || null;
+      }
+      return null;
+    }
+
     if (tenantId) {
+      // Check if user has direct assignment to the requested tenant
+      const userTenantAssignment = await this.prisma.userTenant.findFirst({
+        where: {
+          userId: user.id,
+          tenantId: tenantId,
+        },
+        include: {
+          tenant: {
+            select: { path: true },
+          },
+        },
+      });
+
+      if (userTenantAssignment) {
+        // User has direct assignment to this tenant - allow access
+        return userTenantAssignment.tenant.path;
+      }
+
+      // Check hierarchical access (user's tenant path contains selected tenant)
       const selectedTenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { path: true },
       });
 
-      if (!selectedTenant) {
-        return user.tenantPath;
+      if (selectedTenant && selectedTenant.path.startsWith(user.tenantPath)) {
+        return selectedTenant.path;
       }
 
-      // For non-admin users, verify they have access to the selected tenant
-      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-        if (!selectedTenant.path.startsWith(user.tenantPath)) {
-          return user.tenantPath;
-        }
-      }
-
-      return selectedTenant.path;
+      // No access to requested tenant - fall back to user's primary tenant
+      return user.tenantPath;
     }
 
-    // No tenant selected - Platform admin sees all, others see their hierarchy
-    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
-      return null;
-    }
-
+    // No tenantId specified - use user's primary tenant path
     return user.tenantPath;
   }
 
@@ -182,8 +230,8 @@ export class MetersService {
       };
     }
 
-    if (query.customerId) {
-      whereClause.customerId = query.customerId;
+    if (query.subscriptionId) {
+      whereClause.subscriptionId = query.subscriptionId;
     }
 
     if (query.status) {
@@ -214,8 +262,12 @@ export class MetersService {
           tenant: {
             select: { id: true, name: true },
           },
-          customer: {
-            select: { id: true, details: true },
+          subscription: {
+            include: {
+              customer: {
+                select: { id: true, details: true, customerType: true },
+              },
+            },
           },
           meterProfile: {
             select: { id: true, brand: true, modelCode: true, meterType: true },
@@ -260,7 +312,11 @@ export class MetersService {
         tenant: {
           select: { id: true, name: true, path: true },
         },
-        customer: true,
+        subscription: {
+          include: {
+            customer: true,
+          },
+        },
         meterProfile: true,
         activeDevice: {
           include: {
@@ -283,11 +339,10 @@ export class MetersService {
       throw new NotFoundException('Meter not found');
     }
 
-    // Check access
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!meter.tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this meter');
-      }
+    // Check access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, meter.tenant.path, meter.tenantId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this meter');
     }
 
     return meter;
@@ -314,26 +369,40 @@ export class MetersService {
       }
     }
 
+    // If subscription is being changed, verify it belongs to same tenant
+    if (dto.subscriptionId) {
+      const subscription = await this.prisma.subscription.findFirst({
+        where: {
+          id: dto.subscriptionId,
+          tenantId: meter.tenantId,
+        },
+      });
+
+      if (!subscription) {
+        throw new NotFoundException('Subscription not found or does not belong to this tenant');
+      }
+    }
+
     const updated = await this.prisma.meter.update({
       where: { id },
       data: {
-        customerId: dto.customerId,
+        subscriptionId: dto.subscriptionId,
         meterProfileId: dto.meterProfileId,
         serialNumber: dto.serialNumber,
         status: dto.status,
         valveStatus: dto.valveStatus,
-        address: dto.address as any,
-        addressCode: dto.addressCode,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
         metadata: dto.metadata as any,
       },
       include: {
         tenant: {
           select: { id: true, name: true },
         },
-        customer: {
-          select: { id: true, details: true },
+        subscription: {
+          include: {
+            customer: {
+              select: { id: true, details: true },
+            },
+          },
         },
         meterProfile: {
           select: { id: true, brand: true, modelCode: true },
@@ -381,8 +450,75 @@ export class MetersService {
   }
 
   /**
+   * Link a meter to a subscription
+   */
+  async linkSubscription(
+    meterId: string,
+    dto: LinkSubscriptionDto,
+    user: AuthenticatedUser,
+  ): Promise<Meter> {
+    const meter = await this.findOne(meterId, user);
+
+    // Verify subscription exists and belongs to same tenant
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        id: dto.subscriptionId,
+        tenantId: meter.tenantId,
+      },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found or does not belong to this tenant');
+    }
+
+    const updated = await this.prisma.meter.update({
+      where: { id: meterId },
+      data: { subscriptionId: dto.subscriptionId },
+      include: {
+        tenant: { select: { id: true, name: true } },
+        subscription: {
+          include: {
+            customer: { select: { id: true, details: true } },
+          },
+        },
+        meterProfile: { select: { id: true, brand: true, modelCode: true } },
+        activeDevice: { select: { id: true, serialNumber: true, status: true } },
+      },
+    });
+
+    this.logger.log(`Linked meter ${meter.serialNumber} to subscription ${dto.subscriptionId}`);
+    return updated;
+  }
+
+  /**
+   * Unlink a meter from its subscription
+   */
+  async unlinkSubscription(
+    meterId: string,
+    user: AuthenticatedUser,
+  ): Promise<Meter> {
+    const meter = await this.findOne(meterId, user);
+
+    if (!meter.subscriptionId) {
+      throw new BadRequestException('Meter is not linked to any subscription');
+    }
+
+    const updated = await this.prisma.meter.update({
+      where: { id: meterId },
+      data: { subscriptionId: null },
+      include: {
+        tenant: { select: { id: true, name: true } },
+        meterProfile: { select: { id: true, brand: true, modelCode: true } },
+        activeDevice: { select: { id: true, serialNumber: true, status: true } },
+      },
+    });
+
+    this.logger.log(`Unlinked meter ${meter.serialNumber} from subscription`);
+    return updated;
+  }
+
+  /**
    * Link a device to a meter
-   * Device must be in WAREHOUSE status
    */
   async linkDevice(
     meterId: string,
@@ -422,11 +558,10 @@ export class MetersService {
       );
     }
 
-    // Check device belongs to same tenant or child tenant
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!device.tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('Device does not belong to your tenant');
-      }
+    // Check device belongs to accessible tenant (hierarchical OR direct assignment)
+    const hasDeviceAccess = await this.hasUserAccessToTenant(user, device.tenant.path, device.tenantId);
+    if (!hasDeviceAccess) {
+      throw new ForbiddenException('Device does not belong to your tenant');
     }
 
     // Check compatibility with meter profile
@@ -438,19 +573,21 @@ export class MetersService {
 
     // Transaction: Link device to meter
     const updated = await this.prisma.$transaction(async (tx) => {
-      // Update device status to DEPLOYED
       await tx.device.update({
         where: { id: dto.deviceId },
         data: { status: DeviceStatus.DEPLOYED },
       });
 
-      // Link device to meter
       const updatedMeter = await tx.meter.update({
         where: { id: meterId },
         data: { activeDeviceId: dto.deviceId },
         include: {
           tenant: { select: { id: true, name: true } },
-          customer: { select: { id: true, details: true } },
+          subscription: {
+            include: {
+              customer: { select: { id: true, details: true } },
+            },
+          },
           meterProfile: { select: { id: true, brand: true, modelCode: true } },
           activeDevice: {
             include: { deviceProfile: true },
@@ -458,7 +595,6 @@ export class MetersService {
         },
       });
 
-      // Log activity
       await tx.activityLog.create({
         data: {
           userId: user.id,
@@ -476,10 +612,7 @@ export class MetersService {
       return updatedMeter;
     });
 
-    this.logger.log(
-      `Linked device ${device.serialNumber} to meter ${meter.serialNumber}`,
-    );
-
+    this.logger.log(`Linked device ${device.serialNumber} to meter ${meter.serialNumber}`);
     return updated;
   }
 
@@ -500,26 +633,26 @@ export class MetersService {
     const deviceId = meter.activeDeviceId;
     const newStatus = dto.deviceStatus || 'WAREHOUSE';
 
-    // Transaction: Unlink device from meter
     const updated = await this.prisma.$transaction(async (tx) => {
-      // Update device status
       await tx.device.update({
         where: { id: deviceId },
         data: { status: newStatus as DeviceStatus },
       });
 
-      // Unlink device from meter
       const updatedMeter = await tx.meter.update({
         where: { id: meterId },
         data: { activeDeviceId: null },
         include: {
           tenant: { select: { id: true, name: true } },
-          customer: { select: { id: true, details: true } },
+          subscription: {
+            include: {
+              customer: { select: { id: true, details: true } },
+            },
+          },
           meterProfile: { select: { id: true, brand: true, modelCode: true } },
         },
       });
 
-      // Log activity
       await tx.activityLog.create({
         data: {
           userId: user.id,
@@ -538,7 +671,6 @@ export class MetersService {
     });
 
     this.logger.log(`Unlinked device from meter ${meter.serialNumber}`);
-
     return updated;
   }
 
@@ -556,8 +688,6 @@ export class MetersService {
       throw new BadRequestException('This meter does not have valve control');
     }
 
-    // In a real implementation, this would send a command to the device
-    // For now, we just update the status
     const updated = await this.prisma.meter.update({
       where: { id },
       data: {
@@ -566,9 +696,6 @@ export class MetersService {
     });
 
     this.logger.log(`Valve ${dto.action} for meter: ${meter.serialNumber}`);
-
-    // TODO: Send command to device via MQTT/HTTP
-
     return updated;
   }
 

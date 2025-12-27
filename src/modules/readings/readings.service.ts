@@ -61,30 +61,57 @@ export class ReadingsService {
   /**
    * Get the effective tenant path for filtering
    */
+  /**
+   * Get the effective tenant path for filtering
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
+   */
   private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
+    // Platform admin can see everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      if (tenantId) {
+        const selectedTenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { path: true },
+        });
+        return selectedTenant?.path || null;
+      }
+      return null;
+    }
+
     if (tenantId) {
+      // Check if user has direct assignment to the requested tenant
+      const userTenantAssignment = await this.prisma.userTenant.findFirst({
+        where: {
+          userId: user.id,
+          tenantId: tenantId,
+        },
+        include: {
+          tenant: {
+            select: { path: true },
+          },
+        },
+      });
+
+      if (userTenantAssignment) {
+        // User has direct assignment to this tenant - allow access
+        return userTenantAssignment.tenant.path;
+      }
+
+      // Check hierarchical access (user's tenant path contains selected tenant)
       const selectedTenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { path: true },
       });
 
-      if (!selectedTenant) {
-        return user.tenantPath;
+      if (selectedTenant && selectedTenant.path.startsWith(user.tenantPath)) {
+        return selectedTenant.path;
       }
 
-      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-        if (!selectedTenant.path.startsWith(user.tenantPath)) {
-          return user.tenantPath;
-        }
-      }
-
-      return selectedTenant.path;
+      // No access to requested tenant - fall back to user's primary tenant
+      return user.tenantPath;
     }
 
-    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
-      return null;
-    }
-
+    // No tenantId specified - use user's primary tenant path
     return user.tenantPath;
   }
 
@@ -134,10 +161,16 @@ export class ReadingsService {
               id: true,
               serialNumber: true,
               tenantId: true,
-              customer: {
+              subscription: {
                 select: {
                   id: true,
-                  details: true,
+                  address: true,
+                  customer: {
+                    select: {
+                      id: true,
+                      details: true,
+                    },
+                  },
                 },
               },
             },
@@ -170,10 +203,16 @@ export class ReadingsService {
               id: r.meter.id,
               serialNumber: r.meter.serialNumber,
               tenantId: r.meter.tenantId,
-              customer: r.meter.customer
+              subscription: r.meter.subscription
                 ? {
-                    id: r.meter.customer.id,
-                    details: r.meter.customer.details as Record<string, unknown>,
+                    id: r.meter.subscription.id,
+                    address: r.meter.subscription.address as Record<string, unknown>,
+                    customer: r.meter.subscription.customer
+                      ? {
+                          id: r.meter.subscription.customer.id,
+                          details: r.meter.subscription.customer.details as Record<string, unknown>,
+                        }
+                      : null,
                   }
                 : null,
             }

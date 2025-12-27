@@ -1,5 +1,7 @@
 // =============================================================================
-// Customer DTOs
+// Customer DTOs - Updated for Subscription Model
+// =============================================================================
+// Address is now on Subscription, not Customer
 // =============================================================================
 
 import {
@@ -7,8 +9,8 @@ import {
   IsEnum,
   IsOptional,
   IsObject,
-  IsNumber,
   IsUUID,
+  IsNotEmpty,
 } from 'class-validator';
 
 export enum CustomerType {
@@ -16,39 +18,19 @@ export enum CustomerType {
   ORGANIZATIONAL = 'ORGANIZATIONAL',
 }
 
-export enum ConsumptionType {
-  NORMAL = 'NORMAL',
-  HIGH = 'HIGH',
-}
-
 export class CreateCustomerDto {
   @IsUUID()
   tenantId: string;
 
+  @IsString()
+  @IsNotEmpty()
+  customerNumber: string;
+
   @IsEnum(CustomerType)
   customerType: CustomerType;
 
-  @IsOptional()
-  @IsEnum(ConsumptionType)
-  consumptionType?: ConsumptionType;
-
   @IsObject()
   details: Record<string, unknown>;
-
-  @IsObject()
-  address: Record<string, unknown>;
-
-  @IsOptional()
-  @IsString()
-  addressCode?: string;
-
-  @IsOptional()
-  @IsNumber()
-  latitude?: number;
-
-  @IsOptional()
-  @IsNumber()
-  longitude?: number;
 
   @IsOptional()
   @IsObject()
@@ -57,32 +39,17 @@ export class CreateCustomerDto {
 
 export class UpdateCustomerDto {
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  customerNumber?: string;
+
+  @IsOptional()
   @IsEnum(CustomerType)
   customerType?: CustomerType;
 
   @IsOptional()
-  @IsEnum(ConsumptionType)
-  consumptionType?: ConsumptionType;
-
-  @IsOptional()
   @IsObject()
   details?: Record<string, unknown>;
-
-  @IsOptional()
-  @IsObject()
-  address?: Record<string, unknown>;
-
-  @IsOptional()
-  @IsString()
-  addressCode?: string;
-
-  @IsOptional()
-  @IsNumber()
-  latitude?: number;
-
-  @IsOptional()
-  @IsNumber()
-  longitude?: number;
 
   @IsOptional()
   @IsObject()

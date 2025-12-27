@@ -1,5 +1,7 @@
 // =============================================================================
-// Customers Service
+// Customers Service - Updated for Subscription Model
+// =============================================================================
+// Address is now on Subscription, not Customer
 // =============================================================================
 
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
@@ -15,23 +17,23 @@ export interface CustomerData {
   updatedAt: Date;
   tenantId: string;
   customerType: string;
-  consumptionType: string;
   details: Record<string, unknown>;
-  address: Record<string, unknown>;
-  addressCode: string | null;
-  latitude: number | null;
-  longitude: number | null;
   metadata: Record<string, unknown> | null;
   tenant?: {
     id: string;
     name: string;
     path: string;
   };
-  meters?: Array<{
+  subscriptions?: Array<{
     id: string;
-    serialNumber: string;
-    status: string;
+    subscriptionType: string;
+    subscriptionGroup: string;
+    address: Record<string, unknown>;
+    isActive: boolean;
   }>;
+  _count?: {
+    subscriptions: number;
+  };
 }
 
 export interface PaginatedCustomers {
@@ -61,37 +63,82 @@ export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Check if user has access to a specific tenant
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
+   */
+  private async hasUserAccessToTenant(user: AuthenticatedUser, tenantPath: string, tenantId: string): Promise<boolean> {
+    // Platform admin can access everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      return true;
+    }
+
+    // Check hierarchical access (tenant is descendant or ancestor)
+    if (tenantPath.startsWith(user.tenantPath) || user.tenantPath.startsWith(tenantPath)) {
+      return true;
+    }
+
+    // Check for direct tenant assignment
+    const directAssignment = await this.prisma.userTenant.findFirst({
+      where: {
+        userId: user.id,
+        tenantId: tenantId,
+      },
+    });
+
+    return !!directAssignment;
+  }
+
+  /**
    * Get the effective tenant path for filtering
-   * - If tenantId is provided, use that tenant's path (after access check)
-   * - Otherwise, use user's tenant path (platform admin gets null = no filter)
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
    */
   private async getEffectiveTenantPath(user: AuthenticatedUser, tenantId?: string): Promise<string | null> {
-    // If specific tenant selected, look up its path
+    // Platform admin can see everything
+    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
+      if (tenantId) {
+        const selectedTenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { path: true },
+        });
+        return selectedTenant?.path || null;
+      }
+      return null;
+    }
+
     if (tenantId) {
+      // Check if user has direct assignment to the requested tenant
+      const userTenantAssignment = await this.prisma.userTenant.findFirst({
+        where: {
+          userId: user.id,
+          tenantId: tenantId,
+        },
+        include: {
+          tenant: {
+            select: { path: true },
+          },
+        },
+      });
+
+      if (userTenantAssignment) {
+        // User has direct assignment to this tenant - allow access
+        return userTenantAssignment.tenant.path;
+      }
+
+      // Check hierarchical access (user's tenant path contains selected tenant)
       const selectedTenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { path: true },
       });
 
-      if (!selectedTenant) {
-        return user.tenantPath; // Fallback to user's tenant
+      if (selectedTenant && selectedTenant.path.startsWith(user.tenantPath)) {
+        return selectedTenant.path;
       }
 
-      // For non-admin users, verify they have access to the selected tenant
-      if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-        if (!selectedTenant.path.startsWith(user.tenantPath)) {
-          return user.tenantPath; // No access, fallback to user's tenant
-        }
-      }
-
-      return selectedTenant.path;
+      // No access to requested tenant - fall back to user's primary tenant
+      return user.tenantPath;
     }
 
-    // No tenant selected - Platform admin sees all, others see their hierarchy
-    if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
-      return null; // No filter for platform admin without tenant selection
-    }
-
+    // No tenantId specified - use user's primary tenant path
     return user.tenantPath;
   }
 
@@ -105,10 +152,8 @@ export class CustomersService {
 
     const where: Prisma.CustomerWhereInput = {};
 
-    // Get effective tenant path for filtering
     const effectivePath = await this.getEffectiveTenantPath(user, params.tenantId);
     
-    // Apply tenant filter based on effective path
     if (effectivePath) {
       where.tenant = {
         path: {
@@ -142,6 +187,18 @@ export class CustomersService {
             string_contains: params.search,
           },
         },
+        {
+          details: {
+            path: ['tcIdNo'],
+            string_contains: params.search,
+          },
+        },
+        {
+          details: {
+            path: ['taxId'],
+            string_contains: params.search,
+          },
+        },
       ];
     }
 
@@ -160,11 +217,18 @@ export class CustomersService {
               path: true,
             },
           },
-          meters: {
+          subscriptions: {
             select: {
               id: true,
-              serialNumber: true,
-              status: true,
+              subscriptionType: true,
+              subscriptionGroup: true,
+              address: true,
+              isActive: true,
+            },
+          },
+          _count: {
+            select: {
+              subscriptions: true,
             },
           },
         },
@@ -198,11 +262,22 @@ export class CustomersService {
             path: true,
           },
         },
-        meters: {
+        subscriptions: {
+          include: {
+            meters: {
+              select: {
+                id: true,
+                serialNumber: true,
+                status: true,
+                lastReadingValue: true,
+                lastReadingTime: true,
+              },
+            },
+          },
+        },
+        _count: {
           select: {
-            id: true,
-            serialNumber: true,
-            status: true,
+            subscriptions: true,
           },
         },
       },
@@ -212,11 +287,10 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    // CRITICAL: Check tenant access
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!customer.tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to this customer');
-      }
+    // CRITICAL: Check tenant access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, customer.tenant.path, customer.tenantId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this customer');
     }
 
     return this.mapCustomer(customer);
@@ -235,23 +309,17 @@ export class CustomersService {
       throw new NotFoundException('Tenant not found');
     }
 
-    // CRITICAL: Check tenant access for creation
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to create customers in this tenant');
-      }
+    // CRITICAL: Check tenant access for creation (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, tenant.path, tenant.id);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to create customers in this tenant');
     }
 
     const customer = await this.prisma.customer.create({
       data: {
         tenantId: dto.tenantId,
         customerType: dto.customerType as any,
-        consumptionType: (dto.consumptionType || 'NORMAL') as any,
         details: dto.details as any,
-        address: dto.address as any,
-        addressCode: dto.addressCode,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
         metadata: dto.metadata as any,
       },
       include: {
@@ -262,11 +330,18 @@ export class CustomersService {
             path: true,
           },
         },
-        meters: {
+        subscriptions: {
           select: {
             id: true,
-            serialNumber: true,
-            status: true,
+            subscriptionType: true,
+            subscriptionGroup: true,
+            address: true,
+            isActive: true,
+          },
+        },
+        _count: {
+          select: {
+            subscriptions: true,
           },
         },
       },
@@ -293,23 +368,17 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    // CRITICAL: Check tenant access for update
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!existing.tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to update this customer');
-      }
+    // CRITICAL: Check tenant access for update (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, existing.tenant.path, existing.tenantId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to update this customer');
     }
 
     const customer = await this.prisma.customer.update({
       where: { id },
       data: {
         ...(dto.customerType && { customerType: dto.customerType as any }),
-        ...(dto.consumptionType && { consumptionType: dto.consumptionType as any }),
         ...(dto.details && { details: dto.details as any }),
-        ...(dto.address && { address: dto.address as any }),
-        ...(dto.addressCode !== undefined && { addressCode: dto.addressCode }),
-        ...(dto.latitude !== undefined && { latitude: dto.latitude }),
-        ...(dto.longitude !== undefined && { longitude: dto.longitude }),
         ...(dto.metadata !== undefined && { metadata: dto.metadata as any }),
       },
       include: {
@@ -320,11 +389,18 @@ export class CustomersService {
             path: true,
           },
         },
-        meters: {
+        subscriptions: {
           select: {
             id: true,
-            serialNumber: true,
-            status: true,
+            subscriptionType: true,
+            subscriptionGroup: true,
+            address: true,
+            isActive: true,
+          },
+        },
+        _count: {
+          select: {
+            subscriptions: true,
           },
         },
       },
@@ -343,6 +419,11 @@ export class CustomersService {
         tenant: {
           select: { id: true, name: true, path: true },
         },
+        _count: {
+          select: {
+            subscriptions: true,
+          },
+        },
       },
     });
 
@@ -350,11 +431,17 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    // CRITICAL: Check tenant access for delete
-    if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      if (!existing.tenant.path.startsWith(user.tenantPath)) {
-        throw new ForbiddenException('You do not have access to delete this customer');
-      }
+    // CRITICAL: Check tenant access for delete (hierarchical OR direct assignment)
+    const hasAccess = await this.hasUserAccessToTenant(user, existing.tenant.path, existing.tenantId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to delete this customer');
+    }
+
+    // Check for subscriptions
+    if (existing._count.subscriptions > 0) {
+      throw new ForbiddenException(
+        `Cannot delete customer with ${existing._count.subscriptions} subscriptions. Delete subscriptions first.`
+      );
     }
 
     await this.prisma.customer.delete({ where: { id } });
@@ -368,15 +455,11 @@ export class CustomersService {
       updatedAt: customer.updatedAt,
       tenantId: customer.tenantId,
       customerType: customer.customerType,
-      consumptionType: customer.consumptionType,
       details: customer.details as Record<string, unknown>,
-      address: customer.address as Record<string, unknown>,
-      addressCode: customer.addressCode,
-      latitude: customer.latitude ? Number(customer.latitude) : null,
-      longitude: customer.longitude ? Number(customer.longitude) : null,
       metadata: customer.metadata as Record<string, unknown> | null,
       tenant: customer.tenant,
-      meters: customer.meters,
+      subscriptions: customer.subscriptions,
+      _count: customer._count,
     };
   }
 }

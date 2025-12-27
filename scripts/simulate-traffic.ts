@@ -1,16 +1,17 @@
 /**
  * =============================================================================
- * Read Water - Traffic Simulator - Refactored for Asset/Device Split
+ * Read Water - Traffic Simulator - Updated for Subscription Model
  * =============================================================================
  * 
  * This script simulates high-volume IoT meter readings to test the ingestion
  * pipeline: HTTP Ingest -> BullMQ -> Worker -> TimescaleDB -> Socket.IO -> UI
  * 
- * NEW ARCHITECTURE:
+ * ARCHITECTURE (Updated):
  * - Creates DeviceProfiles with decoder functions
  * - Creates Devices (communication units) in inventory
- * - Creates Customers (required for meters)
- * - Creates Meters (pure assets)
+ * - Creates Customers (registry of people/orgs)
+ * - Creates Subscriptions (service points with addresses)
+ * - Creates Meters (pure assets) linked to Subscriptions
  * - Links Devices to Meters (simulating deployment)
  * 
  * Usage:
@@ -42,13 +43,14 @@ import {
   DialType,
   CommunicationModule,
   IPRating,
-  SubscriptionStatus,
+  TenantSubscriptionStatus,
   ConnectionType,
   MountingType,
   TemperatureType,
   IntegrationType,
   CustomerType,
-  ConsumptionType,
+  SubscriptionType,
+  SubscriptionGroup,
 } from '@prisma/client';
 
 const API_BASE = process.env.API_URL || 'http://localhost:4000';
@@ -161,11 +163,11 @@ function generateDynamicFields(technology: CommunicationTechnology, deviceIdenti
 }
 
 // =============================================================================
-// Setup Phase - Create Real Data
+// Setup Phase - Create Real Data with Subscription Model
 // =============================================================================
 
 async function setupSimulatorData(): Promise<SimulatorDevice[]> {
-  console.log('📦 Setting up simulator data (new Asset/Device architecture)...\n');
+  console.log('📦 Setting up simulator data (Subscription-based architecture)...\n');
 
   // 1. Get or create root tenant
   let tenant = await prisma.tenant.findFirst({
@@ -178,7 +180,7 @@ async function setupSimulatorData(): Promise<SimulatorDevice[]> {
       data: {
         name: 'Root Tenant',
         path: 'Root',
-        subscriptionStatus: SubscriptionStatus.ACTIVE,
+        tenantSubscriptionStatus: TenantSubscriptionStatus.ACTIVE,
         subscriptionPlan: 'ENTERPRISE',
       },
     });
@@ -253,7 +255,7 @@ function decode(payload) {
   }
   console.log(`   ✓ Meter profile ready: ${meterProfile.brand} ${meterProfile.modelCode}`);
 
-  // 4. Get or create simulator customer
+  // 4. Get or create simulator customer (no address - that's on subscription now)
   let customer = await prisma.customer.findFirst({
     where: {
       tenantId: tenant.id,
@@ -267,17 +269,11 @@ function decode(payload) {
       data: {
         tenantId: tenant.id,
         customerType: CustomerType.ORGANIZATIONAL,
-        consumptionType: ConsumptionType.HIGH,
         details: {
           organizationName: 'Simulator Customer',
           taxId: '0000000000',
           contactFirstName: 'Simulator',
           contactLastName: 'Test',
-        },
-        address: {
-          city: 'Ankara',
-          district: 'Çankaya',
-          neighborhood: 'Test',
         },
       },
     });
@@ -291,9 +287,12 @@ function decode(payload) {
   const existingMeters = await prisma.meter.count({
     where: { serialNumber: { startsWith: 'SIM-MTR-' } },
   });
+  const existingSubscriptions = await prisma.subscription.count({
+    where: { addressCode: { startsWith: 'SIM-SUB-' } },
+  });
 
-  if (existingMeters > 0 || existingDevices > 0) {
-    console.log(`   Cleaning up ${existingMeters} meters and ${existingDevices} devices...`);
+  if (existingMeters > 0 || existingDevices > 0 || existingSubscriptions > 0) {
+    console.log(`   Cleaning up ${existingMeters} meters, ${existingDevices} devices, ${existingSubscriptions} subscriptions...`);
     
     // First unlink devices from meters
     await prisma.meter.updateMany({
@@ -304,13 +303,16 @@ function decode(payload) {
     await prisma.meter.deleteMany({
       where: { serialNumber: { startsWith: 'SIM-MTR-' } },
     });
+    await prisma.subscription.deleteMany({
+      where: { addressCode: { startsWith: 'SIM-SUB-' } },
+    });
     await prisma.device.deleteMany({
       where: { serialNumber: { startsWith: 'SIM-DEV-' } },
     });
   }
 
-  // 6. Create new simulator devices and meters
-  console.log(`   Creating ${CONFIG.meters} simulator devices and meters...`);
+  // 6. Create new simulator devices, subscriptions, and meters
+  console.log(`   Creating ${CONFIG.meters} simulator devices, subscriptions, and meters...`);
 
   const simulatorDevices: SimulatorDevice[] = [];
 
@@ -319,7 +321,12 @@ function decode(payload) {
     const deviceIdentifier = generateDeviceIdentifier(technology);
     const deviceSerial = `SIM-DEV-${String(i + 1).padStart(5, '0')}`;
     const meterSerial = `SIM-MTR-${String(i + 1).padStart(5, '0')}`;
+    const subscriptionCode = `SIM-SUB-${String(i + 1).padStart(5, '0')}`;
     const dynamicFields = generateDynamicFields(technology, deviceIdentifier);
+
+    // Random coordinates in Ankara area
+    const latitude = 39.9334 + (Math.random() - 0.5) * 0.1;
+    const longitude = 32.8597 + (Math.random() - 0.5) * 0.1;
 
     // Create device
     const device = await prisma.device.create({
@@ -332,23 +339,35 @@ function decode(payload) {
       },
     });
 
-    // Create meter
-    const meter = await prisma.meter.create({
+    // Create subscription (address is HERE now)
+    const subscription = await prisma.subscription.create({
       data: {
         tenantId: tenant.id,
         customerId: customer.id,
-        meterProfileId: meterProfile.id,
-        serialNumber: meterSerial,
-        initialIndex: 0,
-        installationDate: new Date(),
-        status: MeterStatus.ACTIVE,
+        subscriptionType: SubscriptionType.ORGANIZATIONAL,
+        subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
         address: {
           city: 'Ankara',
           district: 'Çankaya',
           neighborhood: 'Simulator',
         },
-        latitude: 39.9334 + (Math.random() - 0.5) * 0.1,
-        longitude: 32.8597 + (Math.random() - 0.5) * 0.1,
+        addressCode: subscriptionCode,
+        latitude,
+        longitude,
+        isActive: true,
+      },
+    });
+
+    // Create meter linked to subscription (no address on meter anymore)
+    const meter = await prisma.meter.create({
+      data: {
+        tenantId: tenant.id,
+        subscriptionId: subscription.id,
+        meterProfileId: meterProfile.id,
+        serialNumber: meterSerial,
+        initialIndex: 0,
+        installationDate: new Date(),
+        status: MeterStatus.ACTIVE,
       },
     });
 
@@ -408,11 +427,15 @@ async function cleanupSimulatorData(): Promise<void> {
     where: { serialNumber: { startsWith: 'SIM-MTR-' } },
   });
 
+  const deletedSubscriptions = await prisma.subscription.deleteMany({
+    where: { addressCode: { startsWith: 'SIM-SUB-' } },
+  });
+
   const deletedDevices = await prisma.device.deleteMany({
     where: { serialNumber: { startsWith: 'SIM-DEV-' } },
   });
 
-  console.log(`   ✓ Deleted ${deletedMeters.count} meters and ${deletedDevices.count} devices`);
+  console.log(`   ✓ Deleted ${deletedMeters.count} meters, ${deletedSubscriptions.count} subscriptions, and ${deletedDevices.count} devices`);
 }
 
 // =============================================================================
@@ -508,7 +531,7 @@ async function runSimulation(): Promise<void> {
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════════╗');
   console.log('║          Read Water - Traffic Simulator 🌊                     ║');
-  console.log('║          (Asset/Device Split Architecture)                     ║');
+  console.log('║          (Subscription-based Architecture)                     ║');
   console.log('╠════════════════════════════════════════════════════════════════╣');
   console.log(`║  Meters: ${CONFIG.meters.toString().padEnd(10)} │ RPS Target: ${CONFIG.rps.toString().padEnd(10)}       ║`);
   console.log(`║  Duration: ${CONFIG.duration}s          │ API: ${CONFIG.url.slice(0, 25).padEnd(25)} ║`);

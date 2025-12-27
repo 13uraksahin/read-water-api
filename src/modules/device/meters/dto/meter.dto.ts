@@ -1,8 +1,8 @@
 // =============================================================================
-// Meter DTOs - Refactored for Asset/Device Split
+// Meter DTOs - Updated for Subscription Model
 // =============================================================================
-// REMOVED: All connectivity_config, communication fields
-// Meters are now pure assets - connectivity is handled by Device entity
+// Address is now on Subscription, not Meter
+// Meters are linked to Subscriptions, not directly to Customers
 // =============================================================================
 
 import {
@@ -14,63 +14,24 @@ import {
   IsNumber,
   IsDateString,
   IsObject,
-  ValidateNested,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { MeterStatus, ValveStatus } from '@prisma/client';
-
-class AddressDto {
-  @IsString()
-  @IsOptional()
-  city?: string;
-
-  @IsString()
-  @IsOptional()
-  district?: string;
-
-  @IsString()
-  @IsOptional()
-  neighborhood?: string;
-
-  @IsString()
-  @IsOptional()
-  street?: string;
-
-  @IsString()
-  @IsOptional()
-  buildingNo?: string;
-
-  @IsString()
-  @IsOptional()
-  floor?: string;
-
-  @IsString()
-  @IsOptional()
-  doorNo?: string;
-
-  @IsString()
-  @IsOptional()
-  postalCode?: string;
-
-  @IsString()
-  @IsOptional()
-  extraDetails?: string;
-}
 
 export class CreateMeterDto {
   @IsUUID()
   @IsNotEmpty()
   tenantId: string;
 
-  // STRICT: A meter must be related with at least and only 1 customer
-  @IsUUID()
-  @IsNotEmpty()
-  customerId: string;
-
   // STRICT: A meter must be related with at least and only 1 meter profile
   @IsUUID()
   @IsNotEmpty()
   meterProfileId: string;
+
+  // Subscription is optional - meter can be in warehouse without subscription
+  @IsUUID()
+  @IsOptional()
+  subscriptionId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -89,25 +50,6 @@ export class CreateMeterDto {
   @IsOptional()
   status?: MeterStatus;
 
-  @ValidateNested()
-  @Type(() => AddressDto)
-  @IsNotEmpty()
-  address: AddressDto;
-
-  @IsString()
-  @IsOptional()
-  addressCode?: string;
-
-  @IsNumber()
-  @IsOptional()
-  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
-  latitude?: number;
-
-  @IsNumber()
-  @IsOptional()
-  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
-  longitude?: number;
-
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;
@@ -116,7 +58,7 @@ export class CreateMeterDto {
 export class UpdateMeterDto {
   @IsUUID()
   @IsOptional()
-  customerId?: string;
+  subscriptionId?: string;
 
   @IsUUID()
   @IsOptional()
@@ -133,25 +75,6 @@ export class UpdateMeterDto {
   @IsEnum(ValveStatus)
   @IsOptional()
   valveStatus?: ValveStatus;
-
-  @ValidateNested()
-  @Type(() => AddressDto)
-  @IsOptional()
-  address?: AddressDto;
-
-  @IsString()
-  @IsOptional()
-  addressCode?: string;
-
-  @IsNumber()
-  @IsOptional()
-  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
-  latitude?: number;
-
-  @IsNumber()
-  @IsOptional()
-  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
-  longitude?: number;
 
   @IsObject()
   @IsOptional()
@@ -175,7 +98,7 @@ export class MeterQueryDto {
 
   @IsUUID()
   @IsOptional()
-  customerId?: string;
+  subscriptionId?: string;
 
   @IsEnum(MeterStatus)
   @IsOptional()
@@ -215,4 +138,11 @@ export class UnlinkDeviceDto {
   @IsEnum(['WAREHOUSE', 'MAINTENANCE'])
   @IsOptional()
   deviceStatus?: 'WAREHOUSE' | 'MAINTENANCE';
+}
+
+// Link Subscription DTO
+export class LinkSubscriptionDto {
+  @IsUUID()
+  @IsNotEmpty()
+  subscriptionId: string;
 }

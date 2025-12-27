@@ -19,6 +19,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReadingsModule } from './modules/readings/readings.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AlarmsModule } from './modules/alarms/alarms.module';
 import { HealthModule } from './modules/health/health.module';
@@ -72,6 +73,7 @@ import { JwtAuthGuard } from './modules/iam/auth/guards/jwt-auth.guard';
     DashboardModule,
     ReadingsModule,
     CustomersModule,
+    SubscriptionsModule,
     SettingsModule,
     AlarmsModule,
   ],

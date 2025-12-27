@@ -13,6 +13,7 @@ import {
   Max,
   IsBoolean,
   ValidateNested,
+  IsObject,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { CommunicationTechnology, IntegrationType, DeviceBrand } from '@prisma/client';
@@ -48,6 +49,26 @@ export class FieldDefinitionDto {
   description?: string;
 }
 
+// Communication configuration for a single technology
+export class CommunicationConfigDto {
+  @IsEnum(CommunicationTechnology)
+  @IsNotEmpty()
+  technology: CommunicationTechnology;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FieldDefinitionDto)
+  fieldDefinitions: FieldDefinitionDto[];
+
+  @IsOptional()
+  @IsString()
+  decoderFunction?: string;
+
+  @IsOptional()
+  @IsString()
+  testPayload?: string;
+}
+
 export class CreateDeviceProfileDto {
   @IsEnum(DeviceBrand)
   @IsNotEmpty()
@@ -57,19 +78,28 @@ export class CreateDeviceProfileDto {
   @IsNotEmpty()
   modelCode: string;
 
+  // Primary communication technology (for backward compatibility)
   @IsEnum(CommunicationTechnology)
-  @IsNotEmpty()
-  communicationTechnology: CommunicationTechnology;
+  @IsOptional()
+  communicationTechnology?: CommunicationTechnology;
 
   @IsOptional()
   @IsEnum(IntegrationType)
   integrationType?: IntegrationType;
 
+  // Legacy: Single set of field definitions (for backward compatibility)
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FieldDefinitionDto)
   fieldDefinitions?: FieldDefinitionDto[];
+
+  // NEW: Multiple communication configurations (0, 1 or more technologies)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CommunicationConfigDto)
+  communicationConfigs?: CommunicationConfigDto[];
 
   @IsOptional()
   @IsString()
@@ -108,11 +138,19 @@ export class UpdateDeviceProfileDto {
   @IsEnum(IntegrationType)
   integrationType?: IntegrationType;
 
+  // Legacy: Single set of field definitions (for backward compatibility)
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FieldDefinitionDto)
   fieldDefinitions?: FieldDefinitionDto[];
+
+  // NEW: Multiple communication configurations (0, 1 or more technologies)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CommunicationConfigDto)
+  communicationConfigs?: CommunicationConfigDto[];
 
   @IsOptional()
   @IsString()

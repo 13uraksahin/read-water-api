@@ -47,7 +47,8 @@ export class TenantsService {
       }
 
       // Check if user has access to parent tenant
-      if (!this.hasAccessToTenant(user, parent.path)) {
+      const hasAccess = await this.hasAccessToTenant(user, parent.path, parent.id);
+      if (!hasAccess) {
         throw new ForbiddenException('You do not have access to this parent tenant');
       }
 
@@ -82,7 +83,7 @@ export class TenantsService {
         address: dto.address as any,
         latitude: dto.latitude,
         longitude: dto.longitude,
-        subscriptionStatus: dto.subscriptionStatus,
+        tenantSubscriptionStatus: dto.tenantSubscriptionStatus,
         subscriptionPlan: dto.subscriptionPlan,
         settings: dto.settings as any,
         allowedProfiles: dto.allowedProfileIds
@@ -90,10 +91,16 @@ export class TenantsService {
               connect: dto.allowedProfileIds.map((id) => ({ id })),
             }
           : undefined,
+        allowedDeviceProfiles: dto.allowedDeviceProfileIds
+          ? {
+              connect: dto.allowedDeviceProfileIds.map((id) => ({ id })),
+            }
+          : undefined,
       },
       include: {
         parent: true,
         allowedProfiles: true,
+        allowedDeviceProfiles: true,
         _count: {
           select: {
             users: true,
@@ -110,6 +117,7 @@ export class TenantsService {
 
   /**
    * Get all tenants (with ltree-based filtering)
+   * Supports both hierarchical access AND direct tenant assignments for multi-tenant users
    */
   async findAll(
     query: TenantQueryDto,
@@ -119,35 +127,60 @@ export class TenantsService {
     const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
     const skip = (page - 1) * limit;
 
-    // Build where clause based on user's tenant path
-    const whereClause: any = {};
+    // Build where clause based on user's tenant access
+    let whereClause: any = {};
 
-    // Non-platform admins can only see their tenant and descendants
+    // Non-platform admins can see their tenant hierarchy AND direct assignments
     if (user.role !== SYSTEM_ROLES.PLATFORM_ADMIN) {
-      // Use ltree to filter descendants
-      whereClause.path = {
-        startsWith: user.tenantPath,
-      };
+      // Get all tenant IDs the user has direct assignments to
+      const userTenantAssignments = await this.prisma.userTenant.findMany({
+        where: { userId: user.id },
+        select: { tenantId: true, tenant: { select: { path: true } } },
+      });
+
+      // Get all paths from user assignments
+      const assignedTenantIds = userTenantAssignments.map(ut => ut.tenantId);
+      const assignedPaths = userTenantAssignments.map(ut => ut.tenant.path);
+
+      // User can see:
+      // 1. Tenants they have direct assignment to
+      // 2. Descendants of their primary tenant (hierarchical access)
+      whereClause.OR = [
+        // Direct tenant assignments
+        { id: { in: assignedTenantIds } },
+        // Hierarchical access (descendants of primary tenant)
+        { path: { startsWith: user.tenantPath } },
+        // Children of directly assigned tenants
+        ...assignedPaths.map(path => ({ path: { startsWith: path } })),
+      ];
     }
 
+    // Apply additional filters
+    const additionalFilters: any = {};
+
     if (query.search) {
-      whereClause.OR = [
+      additionalFilters.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
         { contactEmail: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
-    if (query.subscriptionStatus) {
-      whereClause.subscriptionStatus = query.subscriptionStatus;
+    if (query.tenantSubscriptionStatus) {
+      additionalFilters.tenantSubscriptionStatus = query.tenantSubscriptionStatus;
     }
 
     if (query.parentId) {
-      whereClause.parentId = query.parentId;
+      additionalFilters.parentId = query.parentId;
     }
+
+    // Combine base access filter with additional filters
+    const finalWhereClause = whereClause.OR 
+      ? { AND: [whereClause, additionalFilters] }
+      : { ...whereClause, ...additionalFilters };
 
     const [tenants, total] = await Promise.all([
       this.prisma.tenant.findMany({
-        where: whereClause,
+        where: finalWhereClause,
         skip,
         take: limit,
         orderBy: {
@@ -167,7 +200,7 @@ export class TenantsService {
           },
         },
       }),
-      this.prisma.tenant.count({ where: whereClause }),
+      this.prisma.tenant.count({ where: finalWhereClause }),
     ]);
 
     return {
@@ -239,6 +272,7 @@ export class TenantsService {
           select: { id: true, name: true, path: true },
         },
         allowedProfiles: true,
+        allowedDeviceProfiles: true,
         users: {
           include: {
             user: {
@@ -267,8 +301,9 @@ export class TenantsService {
       throw new NotFoundException('Tenant not found');
     }
 
-    // Check access
-    if (!this.hasAccessToTenant(user, tenant.path)) {
+    // Check access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasAccessToTenant(user, tenant.path, tenant.id);
+    if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this tenant');
     }
 
@@ -291,8 +326,9 @@ export class TenantsService {
       throw new NotFoundException('Tenant not found');
     }
 
-    // Check access
-    if (!this.hasAccessToTenant(user, tenant.path)) {
+    // Check access (hierarchical OR direct assignment)
+    const hasAccess = await this.hasAccessToTenant(user, tenant.path, tenant.id);
+    if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this tenant');
     }
 
@@ -310,7 +346,7 @@ export class TenantsService {
         address: dto.address as any,
         latitude: dto.latitude,
         longitude: dto.longitude,
-        subscriptionStatus: dto.subscriptionStatus,
+        tenantSubscriptionStatus: dto.tenantSubscriptionStatus,
         subscriptionPlan: dto.subscriptionPlan,
         settings: dto.settings as any,
         allowedProfiles: dto.allowedProfileIds
@@ -318,10 +354,16 @@ export class TenantsService {
               set: dto.allowedProfileIds.map((profileId) => ({ id: profileId })),
             }
           : undefined,
+        allowedDeviceProfiles: dto.allowedDeviceProfileIds
+          ? {
+              set: dto.allowedDeviceProfileIds.map((profileId) => ({ id: profileId })),
+            }
+          : undefined,
       },
       include: {
         parent: true,
         allowedProfiles: true,
+        allowedDeviceProfiles: true,
         _count: {
           select: {
             users: true,
@@ -434,9 +476,9 @@ export class TenantsService {
   }
 
   /**
-   * Check if user has access to a tenant based on ltree path
+   * Check if user has access to a tenant based on ltree path or direct assignment
    */
-  private hasAccessToTenant(user: AuthenticatedUser, tenantPath: string): boolean {
+  private async hasAccessToTenant(user: AuthenticatedUser, tenantPath: string, tenantId?: string): Promise<boolean> {
     if (user.role === SYSTEM_ROLES.PLATFORM_ADMIN) {
       return true;
     }
@@ -444,10 +486,22 @@ export class TenantsService {
     // User can access tenant if:
     // 1. Tenant path starts with user's tenant path (descendant)
     // 2. User's tenant path starts with tenant path (ancestor)
-    return (
-      tenantPath.startsWith(user.tenantPath) ||
-      user.tenantPath.startsWith(tenantPath)
-    );
+    if (tenantPath.startsWith(user.tenantPath) || user.tenantPath.startsWith(tenantPath)) {
+      return true;
+    }
+
+    // 3. User has direct assignment to the tenant
+    if (tenantId) {
+      const directAssignment = await this.prisma.userTenant.findFirst({
+        where: {
+          userId: user.id,
+          tenantId: tenantId,
+        },
+      });
+      return !!directAssignment;
+    }
+
+    return false;
   }
 
   /**

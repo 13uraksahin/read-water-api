@@ -27,6 +27,7 @@ import {
   ControlValveDto,
   LinkDeviceDto,
   UnlinkDeviceDto,
+  LinkSubscriptionDto,
 } from './dto/meter.dto';
 import { JwtAuthGuard } from '../../iam/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../iam/auth/guards/permissions.guard';
@@ -94,6 +95,35 @@ export class MetersController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.metersService.update(id, dto, user);
+  }
+
+  // ==========================================================================
+  // SUBSCRIPTION LINK/UNLINK ENDPOINTS
+  // ==========================================================================
+
+  /**
+   * Link a meter to a subscription
+   */
+  @Post(':id/link-subscription')
+  @RequirePermissions(PERMISSIONS.METER_UPDATE)
+  async linkSubscription(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LinkSubscriptionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.linkSubscription(id, dto, user);
+  }
+
+  /**
+   * Unlink a meter from its subscription
+   */
+  @Post(':id/unlink-subscription')
+  @RequirePermissions(PERMISSIONS.METER_UPDATE)
+  async unlinkSubscription(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.unlinkSubscription(id, user);
   }
 
   // ==========================================================================
