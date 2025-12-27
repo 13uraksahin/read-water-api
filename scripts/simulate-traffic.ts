@@ -268,6 +268,7 @@ function decode(payload) {
     customer = await prisma.customer.create({
       data: {
         tenantId: tenant.id,
+        customerNumber: `SIM-CUST-${Date.now()}`,
         customerType: CustomerType.ORGANIZATIONAL,
         details: {
           organizationName: 'Simulator Customer',
@@ -344,6 +345,7 @@ function decode(payload) {
       data: {
         tenantId: tenant.id,
         customerId: customer.id,
+        subscriptionNumber: subscriptionCode,
         subscriptionType: SubscriptionType.ORGANIZATIONAL,
         subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
         address: {

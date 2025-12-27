@@ -297,6 +297,17 @@ export class CustomersService {
   }
 
   /**
+   * Generate a unique customer number for a tenant
+   */
+  private async generateCustomerNumber(tenantId: string): Promise<string> {
+    const count = await this.prisma.customer.count({
+      where: { tenantId },
+    });
+    const timestamp = Date.now().toString(36).toUpperCase();
+    return `C-${(count + 1).toString().padStart(6, '0')}-${timestamp}`;
+  }
+
+  /**
    * Create a new customer with tenant access check
    */
   async createCustomer(dto: CreateCustomerDto, user: AuthenticatedUser): Promise<CustomerData> {
@@ -315,9 +326,13 @@ export class CustomersService {
       throw new ForbiddenException('You do not have access to create customers in this tenant');
     }
 
+    // Generate unique customer number
+    const customerNumber = dto.customerNumber || await this.generateCustomerNumber(dto.tenantId);
+
     const customer = await this.prisma.customer.create({
       data: {
         tenantId: dto.tenantId,
+        customerNumber,
         customerType: dto.customerType as any,
         details: dto.details as any,
         metadata: dto.metadata as any,

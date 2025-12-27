@@ -278,6 +278,17 @@ export class SubscriptionsService {
   }
 
   /**
+   * Generate a unique subscription number for a tenant
+   */
+  private async generateSubscriptionNumber(tenantId: string): Promise<string> {
+    const count = await this.prisma.subscription.count({
+      where: { tenantId },
+    });
+    const timestamp = Date.now().toString(36).toUpperCase();
+    return `S-${(count + 1).toString().padStart(6, '0')}-${timestamp}`;
+  }
+
+  /**
    * Create a new subscription with tenant access check
    */
   async create(dto: CreateSubscriptionDto, user: AuthenticatedUser): Promise<Subscription> {
@@ -308,10 +319,14 @@ export class SubscriptionsService {
       throw new NotFoundException('Customer not found or does not belong to this tenant');
     }
 
+    // Generate unique subscription number
+    const subscriptionNumber = dto.subscriptionNumber || await this.generateSubscriptionNumber(dto.tenantId);
+
     const subscription = await this.prisma.subscription.create({
       data: {
         tenantId: dto.tenantId,
         customerId: dto.customerId,
+        subscriptionNumber,
         subscriptionType: dto.subscriptionType as any,
         subscriptionGroup: (dto.subscriptionGroup || 'NORMAL_CONSUMPTION') as any,
         address: dto.address as any,

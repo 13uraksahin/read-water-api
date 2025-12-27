@@ -22,9 +22,10 @@ export class CreateCustomerDto {
   @IsUUID()
   tenantId: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  customerNumber: string;
+  customerNumber?: string;
 
   @IsEnum(CustomerType)
   customerType: CustomerType;

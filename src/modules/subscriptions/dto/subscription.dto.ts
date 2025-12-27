@@ -72,9 +72,10 @@ export class CreateSubscriptionDto {
   @IsUUID()
   tenantId: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  subscriptionNumber: string;
+  subscriptionNumber?: string;
 
   @IsUUID()
   customerId: string;

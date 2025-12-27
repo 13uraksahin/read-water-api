@@ -196,6 +196,7 @@ async function seedTestDataIfNeeded(): Promise<boolean> {
     customer = await prisma.customer.create({
       data: {
         tenantId: tenant.id,
+        customerNumber: `TEST-CUST-${Date.now()}`,
         customerType: 'INDIVIDUAL',
         details: { firstName: 'Test', lastName: 'Customer' },
       },
@@ -271,6 +272,7 @@ async function seedTestDataIfNeeded(): Promise<boolean> {
       data: {
         tenantId: tenant.id,
         customerId: customer.id,
+        subscriptionNumber: `TEST-SUB-${Date.now()}-${i}`,
         subscriptionType: SubscriptionType.INDIVIDUAL,
         subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
         address: { city: 'Ankara', district: loc.name },
