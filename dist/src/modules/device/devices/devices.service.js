@@ -53,7 +53,8 @@ let DevicesService = DevicesService_1 = class DevicesService {
         if (!deviceProfile) {
             throw new common_1.NotFoundException('Device profile not found');
         }
-        await this.validateDynamicFields(dto.dynamicFields, deviceProfile);
+        const { selectedTechnology, activeScenarioIds } = this.validateTechnologyAndScenarios(deviceProfile, dto.selectedTechnology, dto.activeScenarioIds);
+        await this.validateDynamicFields(dto.dynamicFields, deviceProfile, selectedTechnology);
         const existingDevice = await this.prisma.device.findUnique({
             where: { serialNumber: dto.serialNumber },
         });
@@ -66,6 +67,8 @@ let DevicesService = DevicesService_1 = class DevicesService {
                 deviceProfileId: dto.deviceProfileId,
                 serialNumber: dto.serialNumber,
                 status: dto.status || client_1.DeviceStatus.WAREHOUSE,
+                selectedTechnology,
+                activeScenarioIds,
                 dynamicFields: dto.dynamicFields,
                 metadata: dto.metadata,
             },
@@ -79,6 +82,7 @@ let DevicesService = DevicesService_1 = class DevicesService {
                         brand: true,
                         modelCode: true,
                         communicationTechnology: true,
+                        specifications: true,
                     },
                 },
             },
@@ -335,11 +339,18 @@ let DevicesService = DevicesService_1 = class DevicesService {
     }
     async update(id, dto, user) {
         const device = await this.findOne(id, user);
+        const deviceProfile = await this.prisma.deviceProfile.findUnique({
+            where: { id: device.deviceProfileId },
+        });
+        let selectedTechnology = dto.selectedTechnology;
+        let activeScenarioIds = dto.activeScenarioIds;
+        if (dto.selectedTechnology !== undefined || dto.activeScenarioIds !== undefined) {
+            const validated = this.validateTechnologyAndScenarios(deviceProfile, dto.selectedTechnology ?? device.selectedTechnology, dto.activeScenarioIds ?? device.activeScenarioIds);
+            selectedTechnology = validated.selectedTechnology;
+            activeScenarioIds = validated.activeScenarioIds;
+        }
         if (dto.dynamicFields) {
-            const deviceProfile = await this.prisma.deviceProfile.findUnique({
-                where: { id: device.deviceProfileId },
-            });
-            await this.validateDynamicFields(dto.dynamicFields, deviceProfile);
+            await this.validateDynamicFields(dto.dynamicFields, deviceProfile, selectedTechnology ?? device.selectedTechnology);
         }
         if (dto.status && device.meter) {
             if (dto.status === client_1.DeviceStatus.WAREHOUSE) {
@@ -350,6 +361,8 @@ let DevicesService = DevicesService_1 = class DevicesService {
             where: { id },
             data: {
                 status: dto.status,
+                selectedTechnology,
+                activeScenarioIds,
                 dynamicFields: dto.dynamicFields,
                 lastSignalStrength: dto.lastSignalStrength,
                 lastBatteryLevel: dto.lastBatteryLevel,
@@ -367,6 +380,7 @@ let DevicesService = DevicesService_1 = class DevicesService {
                         brand: true,
                         modelCode: true,
                         communicationTechnology: true,
+                        specifications: true,
                     },
                 },
                 meter: {
@@ -387,8 +401,60 @@ let DevicesService = DevicesService_1 = class DevicesService {
         });
         this.logger.log(`Deleted device: ${device.serialNumber}`);
     }
-    async validateDynamicFields(fields, profile) {
-        const fieldDefs = profile.fieldDefinitions || [];
+    validateTechnologyAndScenarios(profile, selectedTechnology, activeScenarioIds) {
+        const specs = profile.specifications;
+        const communicationConfigs = specs?.communicationConfigs || [];
+        if (communicationConfigs.length === 0) {
+            return {
+                selectedTechnology: profile.communicationTechnology,
+                activeScenarioIds: [],
+            };
+        }
+        if (communicationConfigs.length === 1) {
+            selectedTechnology = communicationConfigs[0].technology;
+        }
+        if (selectedTechnology) {
+            const techConfig = communicationConfigs.find((c) => c.technology === selectedTechnology);
+            if (!techConfig) {
+                const validTechs = communicationConfigs.map((c) => c.technology).join(', ');
+                throw new common_1.BadRequestException(`Invalid technology "${selectedTechnology}". Valid options: ${validTechs}`);
+            }
+            if (activeScenarioIds && activeScenarioIds.length > 0) {
+                const validScenarioIds = (techConfig.scenarios || []).map((s) => s.id);
+                for (const scenarioId of activeScenarioIds) {
+                    if (!validScenarioIds.includes(scenarioId)) {
+                        throw new common_1.BadRequestException(`Invalid scenario ID "${scenarioId}" for technology "${selectedTechnology}"`);
+                    }
+                }
+                return { selectedTechnology, activeScenarioIds };
+            }
+            const defaultScenarios = (techConfig.scenarios || [])
+                .filter((s) => s.isDefault)
+                .map((s) => s.id);
+            return {
+                selectedTechnology,
+                activeScenarioIds: defaultScenarios.length > 0 ? defaultScenarios : [],
+            };
+        }
+        if (communicationConfigs.length > 1) {
+            const validTechs = communicationConfigs.map((c) => c.technology).join(', ');
+            throw new common_1.BadRequestException(`Device profile has multiple technologies. Please select one: ${validTechs}`);
+        }
+        return {
+            selectedTechnology: null,
+            activeScenarioIds: activeScenarioIds || [],
+        };
+    }
+    async validateDynamicFields(fields, profile, selectedTechnology) {
+        let fieldDefs = profile.fieldDefinitions || [];
+        const specs = profile.specifications;
+        const communicationConfigs = specs?.communicationConfigs || [];
+        if (communicationConfigs.length > 0 && selectedTechnology) {
+            const techConfig = communicationConfigs.find((c) => c.technology === selectedTechnology);
+            if (techConfig?.fieldDefinitions) {
+                fieldDefs = techConfig.fieldDefinitions;
+            }
+        }
         for (const fieldDef of fieldDefs) {
             const value = fields[fieldDef.name];
             if (fieldDef.required && !value) {

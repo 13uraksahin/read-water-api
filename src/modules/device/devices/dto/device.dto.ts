@@ -10,9 +10,10 @@ import {
   IsEnum,
   IsNumber,
   IsObject,
+  IsArray,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { DeviceStatus } from '@prisma/client';
+import { DeviceStatus, CommunicationTechnology } from '@prisma/client';
 
 export class CreateDeviceDto {
   // STRICT: A device must be related with at least and only 1 tenant
@@ -34,6 +35,17 @@ export class CreateDeviceDto {
   @IsOptional()
   status?: DeviceStatus;
 
+  // Selected communication technology (required if profile has multiple technologies)
+  @IsEnum(CommunicationTechnology)
+  @IsOptional()
+  selectedTechnology?: CommunicationTechnology;
+
+  // Active scenario IDs for this device (from the profile's scenarios)
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  activeScenarioIds?: string[];
+
   // Dynamic fields based on DeviceProfile.fieldDefinitions
   // e.g., { DevEUI: "...", JoinEUI: "...", AppKey: "..." }
   @IsObject()
@@ -49,6 +61,17 @@ export class UpdateDeviceDto {
   @IsEnum(DeviceStatus)
   @IsOptional()
   status?: DeviceStatus;
+
+  // Selected communication technology can be changed
+  @IsEnum(CommunicationTechnology)
+  @IsOptional()
+  selectedTechnology?: CommunicationTechnology;
+
+  // Active scenario IDs can be updated
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  activeScenarioIds?: string[];
 
   // Dynamic fields can be updated
   @IsObject()

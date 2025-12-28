@@ -18,6 +18,8 @@ class CreateDeviceDto {
     deviceProfileId;
     serialNumber;
     status;
+    selectedTechnology;
+    activeScenarioIds;
     dynamicFields;
     metadata;
 }
@@ -43,6 +45,17 @@ __decorate([
     __metadata("design:type", String)
 ], CreateDeviceDto.prototype, "status", void 0);
 __decorate([
+    (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateDeviceDto.prototype, "selectedTechnology", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateDeviceDto.prototype, "activeScenarioIds", void 0);
+__decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", Object)
@@ -54,6 +67,8 @@ __decorate([
 ], CreateDeviceDto.prototype, "metadata", void 0);
 class UpdateDeviceDto {
     status;
+    selectedTechnology;
+    activeScenarioIds;
     dynamicFields;
     lastSignalStrength;
     lastBatteryLevel;
@@ -65,6 +80,17 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateDeviceDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.CommunicationTechnology),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], UpdateDeviceDto.prototype, "selectedTechnology", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], UpdateDeviceDto.prototype, "activeScenarioIds", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.IsOptional)(),

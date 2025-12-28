@@ -1,14 +1,18 @@
-import { DeviceStatus } from '@prisma/client';
+import { DeviceStatus, CommunicationTechnology } from '@prisma/client';
 export declare class CreateDeviceDto {
     tenantId: string;
     deviceProfileId: string;
     serialNumber: string;
     status?: DeviceStatus;
+    selectedTechnology?: CommunicationTechnology;
+    activeScenarioIds?: string[];
     dynamicFields: Record<string, string>;
     metadata?: Record<string, any>;
 }
 export declare class UpdateDeviceDto {
     status?: DeviceStatus;
+    selectedTechnology?: CommunicationTechnology;
+    activeScenarioIds?: string[];
     dynamicFields?: Record<string, string>;
     lastSignalStrength?: number;
     lastBatteryLevel?: number;

@@ -14,6 +14,7 @@ import {
   IsBoolean,
   ValidateNested,
   IsObject,
+  IsUUID,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { CommunicationTechnology, IntegrationType, DeviceBrand } from '@prisma/client';
@@ -49,7 +50,45 @@ export class FieldDefinitionDto {
   description?: string;
 }
 
-// Communication configuration for a single technology
+// Scenario definition for a messaging mode within a technology
+export class ScenarioDto {
+  @IsOptional()
+  @IsString()
+  id?: string; // UUID, auto-generated if not provided
+
+  @IsString()
+  @IsNotEmpty()
+  name: string; // Free-form: "Daily Reading", "Alarm", etc.
+
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean; // Default scenario for this technology
+
+  @IsOptional()
+  @IsString()
+  decoderFunction?: string; // Scenario-specific decoder
+
+  @IsOptional()
+  @IsString()
+  testPayload?: string; // For testing this decoder
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(240)
+  expectedBatteryMonths?: number; // Battery life for this messaging mode
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  messageInterval?: number; // Interval in minutes (1440 = daily, 60 = hourly)
+
+  @IsOptional()
+  @IsString()
+  description?: string; // Optional description
+}
+
+// Communication configuration for a single technology (with scenarios)
 export class CommunicationConfigDto {
   @IsEnum(CommunicationTechnology)
   @IsNotEmpty()
@@ -60,10 +99,19 @@ export class CommunicationConfigDto {
   @Type(() => FieldDefinitionDto)
   fieldDefinitions: FieldDefinitionDto[];
 
+  // NEW: Multiple scenarios per technology
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScenarioDto)
+  scenarios?: ScenarioDto[];
+
+  // DEPRECATED: Legacy single decoder (for backward compatibility)
   @IsOptional()
   @IsString()
   decoderFunction?: string;
 
+  // DEPRECATED: Legacy single test payload (for backward compatibility)
   @IsOptional()
   @IsString()
   testPayload?: string;

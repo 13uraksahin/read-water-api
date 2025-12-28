@@ -15,6 +15,29 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../core/prisma/prisma.service");
 const redis_service_1 = require("../../../core/redis/redis.service");
 const constants_1 = require("../../../common/constants");
+const crypto_1 = require("crypto");
+function processScenarios(scenarios) {
+    if (!scenarios || scenarios.length === 0)
+        return [];
+    const processed = scenarios.map((scenario, index) => ({
+        ...scenario,
+        id: scenario.id || (0, crypto_1.randomUUID)(),
+        isDefault: scenario.isDefault ?? (index === 0),
+    }));
+    const hasDefault = processed.some(s => s.isDefault);
+    if (!hasDefault && processed.length > 0) {
+        processed[0].isDefault = true;
+    }
+    return processed;
+}
+function processCommunicationConfigs(configs) {
+    if (!configs)
+        return [];
+    return configs.map(config => ({
+        ...config,
+        scenarios: processScenarios(config.scenarios),
+    }));
+}
 let DeviceProfilesService = DeviceProfilesService_1 = class DeviceProfilesService {
     prisma;
     redisService;
@@ -39,18 +62,20 @@ let DeviceProfilesService = DeviceProfilesService_1 = class DeviceProfilesServic
         let testPayload = dto.testPayload;
         let specifications = {};
         if (dto.communicationConfigs && dto.communicationConfigs.length > 0) {
-            specifications.communicationConfigs = dto.communicationConfigs;
-            const primaryConfig = dto.communicationConfigs[0];
+            const processedConfigs = processCommunicationConfigs(dto.communicationConfigs);
+            specifications.communicationConfigs = processedConfigs;
+            const primaryConfig = processedConfigs[0];
             communicationTechnology = primaryConfig.technology;
-            fieldDefinitions = dto.communicationConfigs.flatMap(config => config.fieldDefinitions.map(fd => ({
+            fieldDefinitions = processedConfigs.flatMap(config => config.fieldDefinitions.map(fd => ({
                 ...fd,
                 technology: config.technology,
             })));
-            if (!decoderFunction && primaryConfig.decoderFunction) {
-                decoderFunction = primaryConfig.decoderFunction;
+            const defaultScenario = primaryConfig.scenarios?.find(s => s.isDefault) || primaryConfig.scenarios?.[0];
+            if (!decoderFunction) {
+                decoderFunction = defaultScenario?.decoderFunction || primaryConfig.decoderFunction;
             }
-            if (!testPayload && primaryConfig.testPayload) {
-                testPayload = primaryConfig.testPayload;
+            if (!testPayload) {
+                testPayload = defaultScenario?.testPayload || primaryConfig.testPayload;
             }
         }
         const profile = await this.prisma.deviceProfile.create({
@@ -170,18 +195,20 @@ let DeviceProfilesService = DeviceProfilesService_1 = class DeviceProfilesServic
         let testPayload = dto.testPayload;
         let specifications = existingProfile.specifications || {};
         if (dto.communicationConfigs && dto.communicationConfigs.length > 0) {
-            specifications.communicationConfigs = dto.communicationConfigs;
-            const primaryConfig = dto.communicationConfigs[0];
+            const processedConfigs = processCommunicationConfigs(dto.communicationConfigs);
+            specifications.communicationConfigs = processedConfigs;
+            const primaryConfig = processedConfigs[0];
             communicationTechnology = primaryConfig.technology;
-            fieldDefinitions = dto.communicationConfigs.flatMap(config => config.fieldDefinitions.map(fd => ({
+            fieldDefinitions = processedConfigs.flatMap(config => config.fieldDefinitions.map(fd => ({
                 ...fd,
                 technology: config.technology,
             })));
-            if (decoderFunction === undefined && primaryConfig.decoderFunction) {
-                decoderFunction = primaryConfig.decoderFunction;
+            const defaultScenario = primaryConfig.scenarios?.find(s => s.isDefault) || primaryConfig.scenarios?.[0];
+            if (decoderFunction === undefined) {
+                decoderFunction = defaultScenario?.decoderFunction || primaryConfig.decoderFunction;
             }
-            if (testPayload === undefined && primaryConfig.testPayload) {
-                testPayload = primaryConfig.testPayload;
+            if (testPayload === undefined) {
+                testPayload = defaultScenario?.testPayload || primaryConfig.testPayload;
             }
         }
         const updated = await this.prisma.deviceProfile.update({

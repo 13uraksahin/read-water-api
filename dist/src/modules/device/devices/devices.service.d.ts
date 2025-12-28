@@ -21,5 +21,6 @@ export declare class DevicesService {
     findByDynamicField(fieldName: string, fieldValue: string): Promise<Device | null>;
     update(id: string, dto: UpdateDeviceDto, user: AuthenticatedUser): Promise<Device>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
+    private validateTechnologyAndScenarios;
     private validateDynamicFields;
 }

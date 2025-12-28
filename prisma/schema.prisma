@@ -179,21 +179,23 @@ model DeviceProfile {
 }
 
 model Device {
-  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
-  tenantId            String        @map("tenant_id") @db.Uuid
-  deviceProfileId     String        @map("device_profile_id") @db.Uuid
-  serialNumber        String        @unique @map("serial_number")
-  status              DeviceStatus  @default(WAREHOUSE)
-  dynamicFields       Json          @default("{}") @map("dynamic_fields")
-  lastSignalStrength  Int?          @map("last_signal_strength")
-  lastBatteryLevel    Int?          @map("last_battery_level")
-  lastCommunicationAt DateTime?     @map("last_communication_at")
-  metadata            Json?
-  deviceProfile       DeviceProfile @relation(fields: [deviceProfileId], references: [id])
-  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  meter               Meter?
+  id                   String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  tenantId             String                   @map("tenant_id") @db.Uuid
+  deviceProfileId      String                   @map("device_profile_id") @db.Uuid
+  serialNumber         String                   @unique @map("serial_number")
+  status               DeviceStatus             @default(WAREHOUSE)
+  dynamicFields        Json                     @default("{}") @map("dynamic_fields")
+  selectedTechnology   CommunicationTechnology? @map("selected_technology")
+  activeScenarioIds    String[]                 @default([]) @map("active_scenario_ids")
+  lastSignalStrength   Int?                     @map("last_signal_strength")
+  lastBatteryLevel     Int?                     @map("last_battery_level")
+  lastCommunicationAt  DateTime?                @map("last_communication_at")
+  metadata             Json?
+  deviceProfile        DeviceProfile            @relation(fields: [deviceProfileId], references: [id])
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  meter                Meter?
 
   @@index([tenantId])
   @@index([deviceProfileId])

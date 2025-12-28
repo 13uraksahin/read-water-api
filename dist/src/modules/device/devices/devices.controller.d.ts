@@ -13,6 +13,8 @@ export declare class DevicesController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
@@ -31,6 +33,8 @@ export declare class DevicesController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
@@ -45,6 +49,8 @@ export declare class DevicesController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
@@ -59,6 +65,8 @@ export declare class DevicesController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
@@ -75,6 +83,8 @@ export declare class DevicesController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
@@ -89,6 +99,8 @@ export declare class DevicesController {
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;

@@ -81,8 +81,15 @@ export class DevicesService {
       throw new NotFoundException('Device profile not found');
     }
 
-    // Validate dynamic fields against profile's field definitions
-    await this.validateDynamicFields(dto.dynamicFields, deviceProfile);
+    // Validate technology and scenario selection
+    const { selectedTechnology, activeScenarioIds } = this.validateTechnologyAndScenarios(
+      deviceProfile,
+      dto.selectedTechnology,
+      dto.activeScenarioIds,
+    );
+
+    // Validate dynamic fields against profile's field definitions (for selected technology)
+    await this.validateDynamicFields(dto.dynamicFields, deviceProfile, selectedTechnology);
 
     // Check serial number uniqueness
     const existingDevice = await this.prisma.device.findUnique({
@@ -101,6 +108,8 @@ export class DevicesService {
         deviceProfileId: dto.deviceProfileId,
         serialNumber: dto.serialNumber,
         status: dto.status || DeviceStatus.WAREHOUSE,
+        selectedTechnology,
+        activeScenarioIds,
         dynamicFields: dto.dynamicFields as any,
         metadata: dto.metadata as any,
       },
@@ -114,6 +123,7 @@ export class DevicesService {
             brand: true,
             modelCode: true,
             communicationTechnology: true,
+            specifications: true,
           },
         },
       },
@@ -477,12 +487,31 @@ export class DevicesService {
   ): Promise<Device> {
     const device = await this.findOne(id, user);
 
+    const deviceProfile = await this.prisma.deviceProfile.findUnique({
+      where: { id: device.deviceProfileId },
+    });
+
+    // Validate technology and scenario selection if provided
+    let selectedTechnology = dto.selectedTechnology;
+    let activeScenarioIds = dto.activeScenarioIds;
+    
+    if (dto.selectedTechnology !== undefined || dto.activeScenarioIds !== undefined) {
+      const validated = this.validateTechnologyAndScenarios(
+        deviceProfile!,
+        dto.selectedTechnology ?? device.selectedTechnology,
+        dto.activeScenarioIds ?? device.activeScenarioIds,
+      );
+      selectedTechnology = validated.selectedTechnology;
+      activeScenarioIds = validated.activeScenarioIds;
+    }
+
     // Validate dynamic fields if changed
     if (dto.dynamicFields) {
-      const deviceProfile = await this.prisma.deviceProfile.findUnique({
-        where: { id: device.deviceProfileId },
-      });
-      await this.validateDynamicFields(dto.dynamicFields, deviceProfile!);
+      await this.validateDynamicFields(
+        dto.dynamicFields, 
+        deviceProfile!, 
+        selectedTechnology ?? device.selectedTechnology,
+      );
     }
 
     // Prevent status change if device is linked to a meter
@@ -498,6 +527,8 @@ export class DevicesService {
       where: { id },
       data: {
         status: dto.status,
+        selectedTechnology,
+        activeScenarioIds,
         dynamicFields: dto.dynamicFields as any,
         lastSignalStrength: dto.lastSignalStrength,
         lastBatteryLevel: dto.lastBatteryLevel,
@@ -515,6 +546,7 @@ export class DevicesService {
             brand: true,
             modelCode: true,
             communicationTechnology: true,
+            specifications: true,
           },
         },
         meter: {
@@ -548,13 +580,106 @@ export class DevicesService {
   }
 
   /**
+   * Validate and resolve technology and scenario selection for a device
+   */
+  private validateTechnologyAndScenarios(
+    profile: any,
+    selectedTechnology?: string | null,
+    activeScenarioIds?: string[],
+  ): { selectedTechnology: string | null; activeScenarioIds: string[] } {
+    const specs = profile.specifications as any;
+    const communicationConfigs = specs?.communicationConfigs || [];
+    
+    // If no communication configs, fall back to legacy behavior
+    if (communicationConfigs.length === 0) {
+      return {
+        selectedTechnology: profile.communicationTechnology,
+        activeScenarioIds: [],
+      };
+    }
+    
+    // If profile has only one technology, auto-select it
+    if (communicationConfigs.length === 1) {
+      selectedTechnology = communicationConfigs[0].technology;
+    }
+    
+    // Validate selected technology exists in profile
+    if (selectedTechnology) {
+      const techConfig = communicationConfigs.find(
+        (c: any) => c.technology === selectedTechnology,
+      );
+      
+      if (!techConfig) {
+        const validTechs = communicationConfigs.map((c: any) => c.technology).join(', ');
+        throw new BadRequestException(
+          `Invalid technology "${selectedTechnology}". Valid options: ${validTechs}`,
+        );
+      }
+      
+      // Validate scenario IDs if provided
+      if (activeScenarioIds && activeScenarioIds.length > 0) {
+        const validScenarioIds = (techConfig.scenarios || []).map((s: any) => s.id);
+        
+        for (const scenarioId of activeScenarioIds) {
+          if (!validScenarioIds.includes(scenarioId)) {
+            throw new BadRequestException(
+              `Invalid scenario ID "${scenarioId}" for technology "${selectedTechnology}"`,
+            );
+          }
+        }
+        
+        return { selectedTechnology, activeScenarioIds };
+      }
+      
+      // If no scenarios specified, use default scenario(s)
+      const defaultScenarios = (techConfig.scenarios || [])
+        .filter((s: any) => s.isDefault)
+        .map((s: any) => s.id);
+      
+      return {
+        selectedTechnology,
+        activeScenarioIds: defaultScenarios.length > 0 ? defaultScenarios : [],
+      };
+    }
+    
+    // If multiple technologies and none selected, require selection
+    if (communicationConfigs.length > 1) {
+      const validTechs = communicationConfigs.map((c: any) => c.technology).join(', ');
+      throw new BadRequestException(
+        `Device profile has multiple technologies. Please select one: ${validTechs}`,
+      );
+    }
+    
+    return {
+      selectedTechnology: null,
+      activeScenarioIds: activeScenarioIds || [],
+    };
+  }
+
+  /**
    * Validate dynamic fields against profile's field definitions
+   * Optionally filter by selected technology
    */
   private async validateDynamicFields(
     fields: Record<string, string>,
     profile: any,
+    selectedTechnology?: string | null,
   ): Promise<void> {
-    const fieldDefs = (profile.fieldDefinitions as any[]) || [];
+    let fieldDefs = (profile.fieldDefinitions as any[]) || [];
+    
+    // If we have communication configs with scenarios, get fields from the selected technology
+    const specs = profile.specifications as any;
+    const communicationConfigs = specs?.communicationConfigs || [];
+    
+    if (communicationConfigs.length > 0 && selectedTechnology) {
+      const techConfig = communicationConfigs.find(
+        (c: any) => c.technology === selectedTechnology,
+      );
+      
+      if (techConfig?.fieldDefinitions) {
+        fieldDefs = techConfig.fieldDefinitions;
+      }
+    }
 
     for (const fieldDef of fieldDefs) {
       const value = fields[fieldDef.name];

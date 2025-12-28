@@ -14,10 +14,43 @@ import {
   CreateDeviceProfileDto,
   UpdateDeviceProfileDto,
   DeviceProfileQueryDto,
+  CommunicationConfigDto,
+  ScenarioDto,
 } from './dto/device-profile.dto';
 import { PaginatedResult } from '../../../common/interfaces';
 import { PAGINATION, CACHE_KEYS, CACHE_TTL } from '../../../common/constants';
 import { DeviceProfile } from '@prisma/client';
+import { randomUUID } from 'crypto';
+
+// Helper to ensure scenarios have IDs and proper defaults
+function processScenarios(scenarios?: ScenarioDto[]): ScenarioDto[] {
+  if (!scenarios || scenarios.length === 0) return [];
+  
+  // Ensure each scenario has an ID
+  const processed = scenarios.map((scenario, index) => ({
+    ...scenario,
+    id: scenario.id || randomUUID(),
+    isDefault: scenario.isDefault ?? (index === 0), // First scenario is default if none specified
+  }));
+  
+  // Ensure exactly one default scenario
+  const hasDefault = processed.some(s => s.isDefault);
+  if (!hasDefault && processed.length > 0) {
+    processed[0].isDefault = true;
+  }
+  
+  return processed;
+}
+
+// Helper to process communication configs with scenarios
+function processCommunicationConfigs(configs?: CommunicationConfigDto[]): CommunicationConfigDto[] {
+  if (!configs) return [];
+  
+  return configs.map(config => ({
+    ...config,
+    scenarios: processScenarios(config.scenarios),
+  }));
+}
 
 @Injectable()
 export class DeviceProfilesService {
@@ -54,15 +87,18 @@ export class DeviceProfilesService {
     let specifications: any = {};
 
     if (dto.communicationConfigs && dto.communicationConfigs.length > 0) {
+      // Process configs to ensure scenarios have IDs and defaults
+      const processedConfigs = processCommunicationConfigs(dto.communicationConfigs);
+      
       // Store all communication configs in specifications
-      specifications.communicationConfigs = dto.communicationConfigs;
+      specifications.communicationConfigs = processedConfigs;
       
       // Use first config as primary for backward compatibility
-      const primaryConfig = dto.communicationConfigs[0];
+      const primaryConfig = processedConfigs[0];
       communicationTechnology = primaryConfig.technology;
       
       // Merge all field definitions from all technologies
-      fieldDefinitions = dto.communicationConfigs.flatMap(config => 
+      fieldDefinitions = processedConfigs.flatMap(config => 
         config.fieldDefinitions.map(fd => ({
           ...fd,
           // Add technology prefix to field name for uniqueness if multiple techs
@@ -70,12 +106,13 @@ export class DeviceProfilesService {
         }))
       );
       
-      // Use primary decoder if not explicitly set
-      if (!decoderFunction && primaryConfig.decoderFunction) {
-        decoderFunction = primaryConfig.decoderFunction;
+      // Use primary decoder from default scenario if not explicitly set
+      const defaultScenario = primaryConfig.scenarios?.find(s => s.isDefault) || primaryConfig.scenarios?.[0];
+      if (!decoderFunction) {
+        decoderFunction = defaultScenario?.decoderFunction || primaryConfig.decoderFunction;
       }
-      if (!testPayload && primaryConfig.testPayload) {
-        testPayload = primaryConfig.testPayload;
+      if (!testPayload) {
+        testPayload = defaultScenario?.testPayload || primaryConfig.testPayload;
       }
     }
 
@@ -221,27 +258,31 @@ export class DeviceProfilesService {
     let specifications: any = (existingProfile.specifications as any) || {};
 
     if (dto.communicationConfigs && dto.communicationConfigs.length > 0) {
+      // Process configs to ensure scenarios have IDs and defaults
+      const processedConfigs = processCommunicationConfigs(dto.communicationConfigs);
+      
       // Store all communication configs in specifications
-      specifications.communicationConfigs = dto.communicationConfigs;
+      specifications.communicationConfigs = processedConfigs;
       
       // Use first config as primary for backward compatibility
-      const primaryConfig = dto.communicationConfigs[0];
+      const primaryConfig = processedConfigs[0];
       communicationTechnology = primaryConfig.technology;
       
       // Merge all field definitions from all technologies
-      fieldDefinitions = dto.communicationConfigs.flatMap(config => 
+      fieldDefinitions = processedConfigs.flatMap(config => 
         config.fieldDefinitions.map(fd => ({
           ...fd,
           technology: config.technology,
         }))
       );
       
-      // Use primary decoder if not explicitly set
-      if (decoderFunction === undefined && primaryConfig.decoderFunction) {
-        decoderFunction = primaryConfig.decoderFunction;
+      // Use primary decoder from default scenario if not explicitly set
+      const defaultScenario = primaryConfig.scenarios?.find(s => s.isDefault) || primaryConfig.scenarios?.[0];
+      if (decoderFunction === undefined) {
+        decoderFunction = defaultScenario?.decoderFunction || primaryConfig.decoderFunction;
       }
-      if (testPayload === undefined && primaryConfig.testPayload) {
-        testPayload = primaryConfig.testPayload;
+      if (testPayload === undefined) {
+        testPayload = defaultScenario?.testPayload || primaryConfig.testPayload;
       }
     }
 

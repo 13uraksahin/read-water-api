@@ -8,9 +8,20 @@ export declare class FieldDefinitionDto {
     required?: boolean;
     description?: string;
 }
+export declare class ScenarioDto {
+    id?: string;
+    name: string;
+    isDefault?: boolean;
+    decoderFunction?: string;
+    testPayload?: string;
+    expectedBatteryMonths?: number;
+    messageInterval?: number;
+    description?: string;
+}
 export declare class CommunicationConfigDto {
     technology: CommunicationTechnology;
     fieldDefinitions: FieldDefinitionDto[];
+    scenarios?: ScenarioDto[];
     decoderFunction?: string;
     testPayload?: string;
 }

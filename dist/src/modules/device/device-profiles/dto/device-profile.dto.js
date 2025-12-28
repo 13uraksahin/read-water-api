@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DeviceProfileQueryDto = exports.UpdateDeviceProfileDto = exports.CreateDeviceProfileDto = exports.CommunicationConfigDto = exports.FieldDefinitionDto = void 0;
+exports.DeviceProfileQueryDto = exports.UpdateDeviceProfileDto = exports.CreateDeviceProfileDto = exports.CommunicationConfigDto = exports.ScenarioDto = exports.FieldDefinitionDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
@@ -58,9 +58,64 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FieldDefinitionDto.prototype, "description", void 0);
+class ScenarioDto {
+    id;
+    name;
+    isDefault;
+    decoderFunction;
+    testPayload;
+    expectedBatteryMonths;
+    messageInterval;
+    description;
+}
+exports.ScenarioDto = ScenarioDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ScenarioDto.prototype, "id", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], ScenarioDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], ScenarioDto.prototype, "isDefault", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ScenarioDto.prototype, "decoderFunction", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ScenarioDto.prototype, "testPayload", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(240),
+    __metadata("design:type", Number)
+], ScenarioDto.prototype, "expectedBatteryMonths", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], ScenarioDto.prototype, "messageInterval", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ScenarioDto.prototype, "description", void 0);
 class CommunicationConfigDto {
     technology;
     fieldDefinitions;
+    scenarios;
     decoderFunction;
     testPayload;
 }
@@ -76,6 +131,13 @@ __decorate([
     (0, class_transformer_1.Type)(() => FieldDefinitionDto),
     __metadata("design:type", Array)
 ], CommunicationConfigDto.prototype, "fieldDefinitions", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ScenarioDto),
+    __metadata("design:type", Array)
+], CommunicationConfigDto.prototype, "scenarios", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
