@@ -23,6 +23,8 @@ import {
   UpdateModuleDto,
   ModuleQueryDto,
   BulkCreateModuleDto,
+  BulkImportModulesDto,
+  ExportModulesQueryDto,
 } from './dto/module.dto';
 import { JwtAuthGuard } from '../../iam/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../iam/auth/guards/permissions.guard';
@@ -73,6 +75,34 @@ export class ModulesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.modulesService.findAvailable(tenantId, meterProfileId, user);
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS (must be before :id routes)
+  // ==========================================================================
+
+  /**
+   * Export modules with current filters (limited to 10,000 rows)
+   */
+  @Get('export')
+  @RequirePermissions(PERMISSIONS.MODULE_READ)
+  async exportModules(
+    @Query() query: ExportModulesQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.modulesService.exportModules(query, user);
+  }
+
+  /**
+   * Bulk import modules from CSV data
+   */
+  @Post('bulk-import')
+  @RequirePermissions(PERMISSIONS.MODULE_CREATE)
+  async bulkImport(
+    @Body() dto: BulkImportModulesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.modulesService.bulkImport(dto, user);
   }
 
   @Get(':id')

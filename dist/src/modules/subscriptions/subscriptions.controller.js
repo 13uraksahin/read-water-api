@@ -25,6 +25,12 @@ let SubscriptionsController = class SubscriptionsController {
     async findAll(query, user) {
         return this.subscriptionsService.findAll(query, user);
     }
+    async exportSubscriptions(query, user) {
+        return this.subscriptionsService.exportSubscriptions(query, user);
+    }
+    async bulkImport(dto, user) {
+        return this.subscriptionsService.bulkImport(dto, user);
+    }
     async findOne(id, user) {
         return this.subscriptionsService.findOne(id, user);
     }
@@ -53,6 +59,22 @@ __decorate([
     __metadata("design:paramtypes", [subscription_dto_1.SubscriptionQueryDto, Object]),
     __metadata("design:returntype", Promise)
 ], SubscriptionsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('export'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [subscription_dto_1.ExportSubscriptionsQueryDto, Object]),
+    __metadata("design:returntype", Promise)
+], SubscriptionsController.prototype, "exportSubscriptions", null);
+__decorate([
+    (0, common_1.Post)('bulk-import'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [subscription_dto_1.BulkImportSubscriptionsDto, Object]),
+    __metadata("design:returntype", Promise)
+], SubscriptionsController.prototype, "bulkImport", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),

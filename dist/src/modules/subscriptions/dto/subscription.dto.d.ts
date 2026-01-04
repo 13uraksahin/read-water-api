@@ -48,4 +48,10 @@ export declare class SubscriptionQueryDto {
     subscriptionGroup?: SubscriptionGroup;
     search?: string;
 }
+export declare class BulkImportSubscriptionsDto {
+    rows: Record<string, string>[];
+}
+export declare class ExportSubscriptionsQueryDto extends SubscriptionQueryDto {
+    limit?: number;
+}
 export {};

@@ -37,6 +37,12 @@ let ModulesController = class ModulesController {
     async findAvailable(tenantId, meterProfileId, user) {
         return this.modulesService.findAvailable(tenantId, meterProfileId, user);
     }
+    async exportModules(query, user) {
+        return this.modulesService.exportModules(query, user);
+    }
+    async bulkImport(dto, user) {
+        return this.modulesService.bulkImport(dto, user);
+    }
     async findOne(id, user) {
         return this.modulesService.findOne(id, user);
     }
@@ -89,6 +95,24 @@ __decorate([
     __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], ModulesController.prototype, "findAvailable", null);
+__decorate([
+    (0, common_1.Get)('export'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.MODULE_READ),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [module_dto_1.ExportModulesQueryDto, Object]),
+    __metadata("design:returntype", Promise)
+], ModulesController.prototype, "exportModules", null);
+__decorate([
+    (0, common_1.Post)('bulk-import'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.MODULE_CREATE),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [module_dto_1.BulkImportModulesDto, Object]),
+    __metadata("design:returntype", Promise)
+], ModulesController.prototype, "bulkImport", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.MODULE_READ),

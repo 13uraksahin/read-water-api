@@ -23,6 +23,8 @@ import {
   LinkDeviceDto,
   UnlinkDeviceDto,
   LinkSubscriptionDto,
+  BulkImportMetersDto,
+  ExportQueryDto,
 } from './dto/meter.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../../common/interfaces';
 import { PAGINATION, SYSTEM_ROLES } from '../../../common/constants';
@@ -709,5 +711,118 @@ export class MetersService {
     startTime.setDate(startTime.getDate() - days);
 
     return this.kysely.getHourlyConsumption(id, startTime, new Date());
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Export meters with filters (limited to 10,000 rows)
+   */
+  async exportMeters(query: ExportQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Meter>> {
+    const MAX_EXPORT_LIMIT = 10000;
+    const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+    
+    return this.findAll({ ...query, page: 1, limit }, user);
+  }
+
+  /**
+   * Bulk import meters from CSV data
+   */
+  async bulkImport(dto: BulkImportMetersDto, user: AuthenticatedUser): Promise<{
+    success: boolean;
+    totalRows: number;
+    importedRows: number;
+    failedRows: number;
+    errors: Array<{ row: number; field: string; message: string }>;
+  }> {
+    const { rows, namePrefix = '', nameSuffix = '', meterProfileId } = dto;
+    const errors: Array<{ row: number; field: string; message: string }> = [];
+    let importedRows = 0;
+
+    // Verify meter profile exists
+    const profile = await this.prisma.meterProfile.findUnique({
+      where: { id: meterProfileId },
+    });
+
+    if (!profile) {
+      return {
+        success: false,
+        totalRows: rows.length,
+        importedRows: 0,
+        failedRows: rows.length,
+        errors: [{ row: 0, field: 'meterProfileId', message: 'Meter profile not found' }],
+      };
+    }
+
+    // Get user's accessible tenant
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { path: { startsWith: user.tenantPath } },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        totalRows: rows.length,
+        importedRows: 0,
+        failedRows: rows.length,
+        errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+      };
+    }
+
+    // Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 because row 1 is header and arrays are 0-indexed
+
+      try {
+        const serialNumber = `${namePrefix}${row.serialNumber}${nameSuffix}`;
+
+        // Check for duplicate serial number
+        const existingMeter = await this.prisma.meter.findUnique({
+          where: { serialNumber },
+        });
+
+        if (existingMeter) {
+          errors.push({
+            row: rowNumber,
+            field: 'serialNumber',
+            message: `Serial number "${serialNumber}" already exists`,
+          });
+          continue;
+        }
+
+        // Create the meter
+        await this.prisma.meter.create({
+          data: {
+            tenantId: tenant.id,
+            meterProfileId,
+            serialNumber,
+            initialIndex: row.initialIndex || 0,
+            installationDate: row.installationDate ? new Date(row.installationDate) : new Date(),
+            status: row.status || 'WAREHOUSE',
+          },
+        });
+
+        importedRows++;
+      } catch (error) {
+        errors.push({
+          row: rowNumber,
+          field: 'unknown',
+          message: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    this.logger.log(`Bulk import: ${importedRows}/${rows.length} meters imported`);
+
+    return {
+      success: errors.length === 0,
+      totalRows: rows.length,
+      importedRows,
+      failedRows: rows.length - importedRows,
+      errors,
+    };
   }
 }

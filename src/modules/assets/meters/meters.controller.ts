@@ -28,6 +28,8 @@ import {
   LinkDeviceDto,
   UnlinkDeviceDto,
   LinkSubscriptionDto,
+  BulkImportMetersDto,
+  ExportQueryDto,
 } from './dto/meter.dto';
 import { JwtAuthGuard } from '../../iam/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../iam/auth/guards/permissions.guard';
@@ -56,6 +58,34 @@ export class MetersController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.metersService.findAll(query, user);
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS (must be before :id routes)
+  // ==========================================================================
+
+  /**
+   * Export meters with current filters (limited to 10,000 rows)
+   */
+  @Get('export')
+  @RequirePermissions(PERMISSIONS.METER_READ)
+  async exportMeters(
+    @Query() query: ExportQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.exportMeters(query, user);
+  }
+
+  /**
+   * Bulk import meters from CSV data
+   */
+  @Post('bulk-import')
+  @RequirePermissions(PERMISSIONS.METER_CREATE)
+  async bulkImport(
+    @Body() dto: BulkImportMetersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.metersService.bulkImport(dto, user);
   }
 
   @Get(':id')

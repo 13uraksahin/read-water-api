@@ -510,6 +510,84 @@ let MetersService = MetersService_1 = class MetersService {
         startTime.setDate(startTime.getDate() - days);
         return this.kysely.getHourlyConsumption(id, startTime, new Date());
     }
+    async exportMeters(query, user) {
+        const MAX_EXPORT_LIMIT = 10000;
+        const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+        return this.findAll({ ...query, page: 1, limit }, user);
+    }
+    async bulkImport(dto, user) {
+        const { rows, namePrefix = '', nameSuffix = '', meterProfileId } = dto;
+        const errors = [];
+        let importedRows = 0;
+        const profile = await this.prisma.meterProfile.findUnique({
+            where: { id: meterProfileId },
+        });
+        if (!profile) {
+            return {
+                success: false,
+                totalRows: rows.length,
+                importedRows: 0,
+                failedRows: rows.length,
+                errors: [{ row: 0, field: 'meterProfileId', message: 'Meter profile not found' }],
+            };
+        }
+        const tenant = await this.prisma.tenant.findFirst({
+            where: { path: { startsWith: user.tenantPath } },
+        });
+        if (!tenant) {
+            return {
+                success: false,
+                totalRows: rows.length,
+                importedRows: 0,
+                failedRows: rows.length,
+                errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+            };
+        }
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNumber = i + 2;
+            try {
+                const serialNumber = `${namePrefix}${row.serialNumber}${nameSuffix}`;
+                const existingMeter = await this.prisma.meter.findUnique({
+                    where: { serialNumber },
+                });
+                if (existingMeter) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'serialNumber',
+                        message: `Serial number "${serialNumber}" already exists`,
+                    });
+                    continue;
+                }
+                await this.prisma.meter.create({
+                    data: {
+                        tenantId: tenant.id,
+                        meterProfileId,
+                        serialNumber,
+                        initialIndex: row.initialIndex || 0,
+                        installationDate: row.installationDate ? new Date(row.installationDate) : new Date(),
+                        status: row.status || 'WAREHOUSE',
+                    },
+                });
+                importedRows++;
+            }
+            catch (error) {
+                errors.push({
+                    row: rowNumber,
+                    field: 'unknown',
+                    message: error.message || 'Unknown error',
+                });
+            }
+        }
+        this.logger.log(`Bulk import: ${importedRows}/${rows.length} meters imported`);
+        return {
+            success: errors.length === 0,
+            totalRows: rows.length,
+            importedRows,
+            failedRows: rows.length - importedRows,
+            errors,
+        };
+    }
 };
 exports.MetersService = MetersService;
 exports.MetersService = MetersService = MetersService_1 = __decorate([

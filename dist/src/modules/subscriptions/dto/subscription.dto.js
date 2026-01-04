@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SubscriptionQueryDto = exports.UpdateSubscriptionDto = exports.CreateSubscriptionDto = exports.SubscriptionGroup = void 0;
+exports.ExportSubscriptionsQueryDto = exports.BulkImportSubscriptionsDto = exports.SubscriptionQueryDto = exports.UpdateSubscriptionDto = exports.CreateSubscriptionDto = exports.SubscriptionGroup = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 var SubscriptionGroup;
@@ -264,4 +264,21 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], SubscriptionQueryDto.prototype, "search", void 0);
+class BulkImportSubscriptionsDto {
+    rows;
+}
+exports.BulkImportSubscriptionsDto = BulkImportSubscriptionsDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], BulkImportSubscriptionsDto.prototype, "rows", void 0);
+class ExportSubscriptionsQueryDto extends SubscriptionQueryDto {
+}
+exports.ExportSubscriptionsQueryDto = ExportSubscriptionsQueryDto;
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : 10000)),
+    __metadata("design:type", Number)
+], ExportSubscriptionsQueryDto.prototype, "limit", void 0);
 //# sourceMappingURL=subscription.dto.js.map

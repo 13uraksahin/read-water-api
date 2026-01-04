@@ -31,6 +31,12 @@ let MetersController = class MetersController {
     async findAll(query, user) {
         return this.metersService.findAll(query, user);
     }
+    async exportMeters(query, user) {
+        return this.metersService.exportMeters(query, user);
+    }
+    async bulkImport(dto, user) {
+        return this.metersService.bulkImport(dto, user);
+    }
     async findOne(id, user) {
         return this.metersService.findOne(id, user);
     }
@@ -81,6 +87,24 @@ __decorate([
     __metadata("design:paramtypes", [meter_dto_1.MeterQueryDto, Object]),
     __metadata("design:returntype", Promise)
 ], MetersController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('export'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.METER_READ),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [meter_dto_1.ExportQueryDto, Object]),
+    __metadata("design:returntype", Promise)
+], MetersController.prototype, "exportMeters", null);
+__decorate([
+    (0, common_1.Post)('bulk-import'),
+    (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.METER_CREATE),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, decorators_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [meter_dto_1.BulkImportMetersDto, Object]),
+    __metadata("design:returntype", Promise)
+], MetersController.prototype, "bulkImport", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, decorators_1.RequirePermissions)(constants_1.PERMISSIONS.METER_READ),

@@ -8,7 +8,7 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Prisma, Subscription } from '@prisma/client';
-import { CreateSubscriptionDto, UpdateSubscriptionDto, SubscriptionQueryDto } from './dto/subscription.dto';
+import { CreateSubscriptionDto, UpdateSubscriptionDto, SubscriptionQueryDto, BulkImportSubscriptionsDto, ExportSubscriptionsQueryDto, SubscriptionGroup } from './dto/subscription.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
 import { PAGINATION, SYSTEM_ROLES } from '../../common/constants';
 
@@ -477,6 +477,167 @@ export class SubscriptionsService {
     });
 
     return this.findOne(subscriptionId, user);
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Export subscriptions with filters (limited to 10,000 rows)
+   */
+  async exportSubscriptions(query: ExportSubscriptionsQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Subscription>> {
+    const MAX_EXPORT_LIMIT = 10000;
+    const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+    
+    return this.findAll({ ...query, page: 1, limit }, user);
+  }
+
+  /**
+   * Bulk import subscriptions from CSV data
+   */
+  async bulkImport(dto: BulkImportSubscriptionsDto, user: AuthenticatedUser): Promise<{
+    success: boolean;
+    totalRows: number;
+    importedRows: number;
+    failedRows: number;
+    errors: Array<{ row: number; field: string; message: string }>;
+  }> {
+    const { rows } = dto;
+    const errors: Array<{ row: number; field: string; message: string }> = [];
+    let importedRows = 0;
+
+    // Get user's accessible tenant
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { path: { startsWith: user.tenantPath } },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        totalRows: rows.length,
+        importedRows: 0,
+        failedRows: rows.length,
+        errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+      };
+    }
+
+    // Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 because row 1 is header and arrays are 0-indexed
+
+      try {
+        // Validate required fields
+        if (!row.subscriptionNumber) {
+          errors.push({
+            row: rowNumber,
+            field: 'subscriptionNumber',
+            message: 'Subscription number is required',
+          });
+          continue;
+        }
+
+        if (!row.customerNumber) {
+          errors.push({
+            row: rowNumber,
+            field: 'customerNumber',
+            message: 'Customer number is required',
+          });
+          continue;
+        }
+
+        // Find customer by customer number
+        const customer = await this.prisma.customer.findFirst({
+          where: {
+            tenantId: tenant.id,
+            customerNumber: row.customerNumber,
+          },
+        });
+
+        if (!customer) {
+          errors.push({
+            row: rowNumber,
+            field: 'customerNumber',
+            message: `Customer with number "${row.customerNumber}" not found`,
+          });
+          continue;
+        }
+
+        // Check for duplicate subscription number
+        const existingSubscription = await this.prisma.subscription.findFirst({
+          where: {
+            tenantId: tenant.id,
+            subscriptionNumber: row.subscriptionNumber,
+          },
+        });
+
+        if (existingSubscription) {
+          errors.push({
+            row: rowNumber,
+            field: 'subscriptionNumber',
+            message: `Subscription number "${row.subscriptionNumber}" already exists`,
+          });
+          continue;
+        }
+
+        // Build address object
+        const address: Record<string, string> = {};
+        if (row.city) address.city = row.city;
+        if (row.district) address.district = row.district;
+        if (row.neighborhood) address.neighborhood = row.neighborhood;
+        if (row.street) address.street = row.street;
+        if (row.buildingNo) address.buildingNo = row.buildingNo;
+        if (row.floor) address.floor = row.floor;
+        if (row.doorNo) address.doorNo = row.doorNo;
+        if (row.postalCode) address.postalCode = row.postalCode;
+        if (row.addressCode) address.addressCode = row.addressCode;
+
+        // Parse subscription group
+        let subscriptionGroup = 'NORMAL_CONSUMPTION';
+        if (row.subscriptionGroup && ['NORMAL_CONSUMPTION', 'HIGH_CONSUMPTION'].includes(row.subscriptionGroup)) {
+          subscriptionGroup = row.subscriptionGroup;
+        }
+
+        // Parse latitude/longitude
+        const latitude = row.latitude ? parseFloat(row.latitude) : null;
+        const longitude = row.longitude ? parseFloat(row.longitude) : null;
+
+        // Create the subscription
+        await this.prisma.subscription.create({
+          data: {
+            tenantId: tenant.id,
+            customerId: customer.id,
+            subscriptionNumber: row.subscriptionNumber,
+            subscriptionGroup: subscriptionGroup as SubscriptionGroup,
+            address: address as any,
+            addressCode: row.addressCode || null,
+            latitude: latitude || null,
+            longitude: longitude || null,
+            isActive: true,
+            startDate: new Date(),
+          },
+        });
+
+        importedRows++;
+      } catch (error) {
+        errors.push({
+          row: rowNumber,
+          field: 'unknown',
+          message: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    this.logger.log(`Bulk import: ${importedRows}/${rows.length} subscriptions imported`);
+
+    return {
+      success: errors.length === 0,
+      totalRows: rows.length,
+      importedRows,
+      failedRows: rows.length - importedRows,
+      errors,
+    };
   }
 }
 

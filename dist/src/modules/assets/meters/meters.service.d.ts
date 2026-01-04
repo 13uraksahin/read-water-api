@@ -1,6 +1,6 @@
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { KyselyService } from '../../../core/kysely/kysely.service';
-import { CreateMeterDto, UpdateMeterDto, MeterQueryDto, ControlValveDto, LinkDeviceDto, UnlinkDeviceDto, LinkSubscriptionDto } from './dto/meter.dto';
+import { CreateMeterDto, UpdateMeterDto, MeterQueryDto, ControlValveDto, LinkDeviceDto, UnlinkDeviceDto, LinkSubscriptionDto, BulkImportMetersDto, ExportQueryDto } from './dto/meter.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../../common/interfaces';
 import { Meter } from '@prisma/client';
 export declare class MetersService {
@@ -26,4 +26,16 @@ export declare class MetersService {
         avg_consumption: number;
         reading_count: number;
     }[]>;
+    exportMeters(query: ExportQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Meter>>;
+    bulkImport(dto: BulkImportMetersDto, user: AuthenticatedUser): Promise<{
+        success: boolean;
+        totalRows: number;
+        importedRows: number;
+        failedRows: number;
+        errors: Array<{
+            row: number;
+            field: string;
+            message: string;
+        }>;
+    }>;
 }

@@ -40,3 +40,18 @@ export declare class UnlinkDeviceDto {
 export declare class LinkSubscriptionDto {
     subscriptionId: string;
 }
+export declare class BulkImportMeterRowDto {
+    serialNumber: string;
+    initialIndex?: number;
+    installationDate?: string;
+    status?: MeterStatus;
+}
+export declare class BulkImportMetersDto {
+    rows: BulkImportMeterRowDto[];
+    namePrefix?: string;
+    nameSuffix?: string;
+    meterProfileId: string;
+}
+export declare class ExportQueryDto extends MeterQueryDto {
+    limit?: number;
+}

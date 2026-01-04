@@ -19,7 +19,7 @@ import {
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import type { PaginatedCustomers, CustomerData } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, BulkImportCustomersDto, ExportCustomersQueryDto } from './dto/customer.dto';
 import { JwtAuthGuard } from '../iam/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators';
 import type { AuthenticatedUser } from '../../common/interfaces';
@@ -45,6 +45,32 @@ export class CustomersController {
       customerType,
       search,
     }, user);
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS (must be before :id routes)
+  // ==========================================================================
+
+  /**
+   * Export customers with current filters (limited to 10,000 rows)
+   */
+  @Get('export')
+  async exportCustomers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ExportCustomersQueryDto,
+  ) {
+    return this.customersService.exportCustomers(query, user);
+  }
+
+  /**
+   * Bulk import customers from CSV data
+   */
+  @Post('bulk-import')
+  async bulkImport(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkImportCustomersDto,
+  ) {
+    return this.customersService.bulkImport(dto, user);
   }
 
   @Get(':id')

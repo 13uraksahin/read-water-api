@@ -40,4 +40,17 @@ export declare class BulkCreateModuleDto {
         metadata?: Record<string, any>;
     }>;
 }
+export declare class BulkImportModuleRowDto {
+    serialNumber: string;
+    [key: string]: string;
+}
+export declare class BulkImportModulesDto {
+    rows: Record<string, string>[];
+    namePrefix?: string;
+    nameSuffix?: string;
+    moduleProfileId: string;
+}
+export declare class ExportModulesQueryDto extends ModuleQueryDto {
+    limit?: number;
+}
 export { CreateModuleDto as CreateDeviceDto, UpdateModuleDto as UpdateDeviceDto, ModuleQueryDto as DeviceQueryDto, BulkCreateModuleDto as BulkCreateDeviceDto, };

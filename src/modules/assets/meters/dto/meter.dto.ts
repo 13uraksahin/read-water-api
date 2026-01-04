@@ -146,3 +146,50 @@ export class LinkSubscriptionDto {
   @IsNotEmpty()
   subscriptionId: string;
 }
+
+// =============================================================================
+// Bulk Import/Export DTOs
+// =============================================================================
+
+export class BulkImportMeterRowDto {
+  @IsString()
+  @IsNotEmpty()
+  serialNumber: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  initialIndex?: number;
+
+  @IsDateString()
+  @IsOptional()
+  installationDate?: string;
+
+  @IsEnum(MeterStatus)
+  @IsOptional()
+  status?: MeterStatus;
+}
+
+export class BulkImportMetersDto {
+  @IsOptional()
+  rows: BulkImportMeterRowDto[];
+
+  @IsString()
+  @IsOptional()
+  namePrefix?: string;
+
+  @IsString()
+  @IsOptional()
+  nameSuffix?: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  meterProfileId: string;
+}
+
+export class ExportQueryDto extends MeterQueryDto {
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 10000))
+  declare limit?: number;
+}

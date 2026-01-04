@@ -189,3 +189,19 @@ export class SubscriptionQueryDto {
   search?: string;
 }
 
+// =============================================================================
+// Bulk Import/Export DTOs
+// =============================================================================
+
+export class BulkImportSubscriptionsDto {
+  @IsOptional()
+  rows: Record<string, string>[];
+}
+
+export class ExportSubscriptionsQueryDto extends SubscriptionQueryDto {
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 10000))
+  declare limit?: number;
+}
+

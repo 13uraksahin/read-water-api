@@ -157,6 +157,43 @@ export class BulkCreateModuleDto {
   }>;
 }
 
+// =============================================================================
+// Bulk Import/Export DTOs
+// =============================================================================
+
+export class BulkImportModuleRowDto {
+  @IsString()
+  @IsNotEmpty()
+  serialNumber: string;
+
+  // Dynamic fields will be parsed from CSV columns
+  [key: string]: string;
+}
+
+export class BulkImportModulesDto {
+  @IsOptional()
+  rows: Record<string, string>[];
+
+  @IsString()
+  @IsOptional()
+  namePrefix?: string;
+
+  @IsString()
+  @IsOptional()
+  nameSuffix?: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  moduleProfileId: string;
+}
+
+export class ExportModulesQueryDto extends ModuleQueryDto {
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 10000))
+  declare limit?: number;
+}
+
 // Legacy aliases for backward compatibility during migration
 export {
   CreateModuleDto as CreateDeviceDto,

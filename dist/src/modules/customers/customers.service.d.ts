@@ -1,5 +1,5 @@
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, BulkImportCustomersDto, ExportCustomersQueryDto } from './dto/customer.dto';
 import { AuthenticatedUser } from '../../common/interfaces';
 export interface CustomerData {
     id: string;
@@ -54,4 +54,16 @@ export declare class CustomersService {
     updateCustomer(id: string, dto: UpdateCustomerDto, user: AuthenticatedUser): Promise<CustomerData>;
     deleteCustomer(id: string, user: AuthenticatedUser): Promise<void>;
     private mapCustomer;
+    exportCustomers(query: ExportCustomersQueryDto, user: AuthenticatedUser): Promise<PaginatedCustomers>;
+    bulkImport(dto: BulkImportCustomersDto, user: AuthenticatedUser): Promise<{
+        success: boolean;
+        totalRows: number;
+        importedRows: number;
+        failedRows: number;
+        errors: Array<{
+            row: number;
+            field: string;
+            message: string;
+        }>;
+    }>;
 }

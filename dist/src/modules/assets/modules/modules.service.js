@@ -472,6 +472,101 @@ let ModulesService = ModulesService_1 = class ModulesService {
             }
         }
     }
+    async exportModules(query, user) {
+        const MAX_EXPORT_LIMIT = 10000;
+        const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+        return this.findAll({ ...query, page: 1, limit }, user);
+    }
+    async bulkImport(dto, user) {
+        const { rows, namePrefix = '', nameSuffix = '', moduleProfileId } = dto;
+        const errors = [];
+        let importedRows = 0;
+        const profile = await this.prisma.deviceProfile.findUnique({
+            where: { id: moduleProfileId },
+        });
+        if (!profile) {
+            return {
+                success: false,
+                totalRows: rows.length,
+                importedRows: 0,
+                failedRows: rows.length,
+                errors: [{ row: 0, field: 'moduleProfileId', message: 'Module profile not found' }],
+            };
+        }
+        const tenant = await this.prisma.tenant.findFirst({
+            where: { path: { startsWith: user.tenantPath } },
+        });
+        if (!tenant) {
+            return {
+                success: false,
+                totalRows: rows.length,
+                importedRows: 0,
+                failedRows: rows.length,
+                errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+            };
+        }
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNumber = i + 2;
+            try {
+                const serialNumber = `${namePrefix}${row.serialNumber}${nameSuffix}`;
+                const existingModule = await this.prisma.device.findUnique({
+                    where: { serialNumber },
+                });
+                if (existingModule) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'serialNumber',
+                        message: `Serial number "${serialNumber}" already exists`,
+                    });
+                    continue;
+                }
+                const knownColumns = ['serialNumber', 'status'];
+                const dynamicFields = {};
+                for (const [key, value] of Object.entries(row)) {
+                    if (!knownColumns.includes(key) && value) {
+                        dynamicFields[key] = String(value);
+                    }
+                }
+                try {
+                    await this.validateDynamicFields(dynamicFields, profile, profile.communicationTechnology);
+                }
+                catch (validationError) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'dynamicFields',
+                        message: validationError.message,
+                    });
+                    continue;
+                }
+                await this.prisma.device.create({
+                    data: {
+                        tenantId: tenant.id,
+                        deviceProfileId: moduleProfileId,
+                        serialNumber,
+                        status: row.status || client_1.DeviceStatus.WAREHOUSE,
+                        dynamicFields: dynamicFields,
+                    },
+                });
+                importedRows++;
+            }
+            catch (error) {
+                errors.push({
+                    row: rowNumber,
+                    field: 'unknown',
+                    message: error.message || 'Unknown error',
+                });
+            }
+        }
+        this.logger.log(`Bulk import: ${importedRows}/${rows.length} modules imported`);
+        return {
+            success: errors.length === 0,
+            totalRows: rows.length,
+            importedRows,
+            failedRows: rows.length - importedRows,
+            errors,
+        };
+    }
 };
 exports.ModulesService = ModulesService;
 exports.DevicesService = ModulesService;

@@ -349,6 +349,117 @@ let CustomersService = CustomersService_1 = class CustomersService {
             _count: customer._count,
         };
     }
+    async exportCustomers(query, user) {
+        const MAX_EXPORT_LIMIT = 10000;
+        const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+        return this.getCustomers({ ...query, page: 1, limit }, user);
+    }
+    async bulkImport(dto, user) {
+        const { rows } = dto;
+        const errors = [];
+        let importedRows = 0;
+        const tenant = await this.prisma.tenant.findFirst({
+            where: { path: { startsWith: user.tenantPath } },
+        });
+        if (!tenant) {
+            return {
+                success: false,
+                totalRows: rows.length,
+                importedRows: 0,
+                failedRows: rows.length,
+                errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+            };
+        }
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNumber = i + 2;
+            try {
+                if (!row.customerNumber) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'customerNumber',
+                        message: 'Customer number is required',
+                    });
+                    continue;
+                }
+                if (!row.customerType || !['INDIVIDUAL', 'ORGANIZATIONAL'].includes(row.customerType)) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'customerType',
+                        message: 'Customer type must be INDIVIDUAL or ORGANIZATIONAL',
+                    });
+                    continue;
+                }
+                const existingCustomer = await this.prisma.customer.findFirst({
+                    where: {
+                        tenantId: tenant.id,
+                        customerNumber: row.customerNumber,
+                    },
+                });
+                if (existingCustomer) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'customerNumber',
+                        message: `Customer number "${row.customerNumber}" already exists`,
+                    });
+                    continue;
+                }
+                const details = {};
+                if (row.customerType === 'INDIVIDUAL') {
+                    if (row.firstName)
+                        details.firstName = row.firstName;
+                    if (row.lastName)
+                        details.lastName = row.lastName;
+                    if (row.tcIdNo)
+                        details.tcIdNo = row.tcIdNo;
+                    if (row.phone)
+                        details.phone = row.phone;
+                    if (row.email)
+                        details.email = row.email;
+                }
+                else {
+                    if (row.organizationName)
+                        details.organizationName = row.organizationName;
+                    if (row.taxId)
+                        details.taxId = row.taxId;
+                    if (row.taxOffice)
+                        details.taxOffice = row.taxOffice;
+                    if (row.contactFirstName)
+                        details.contactFirstName = row.contactFirstName;
+                    if (row.contactLastName)
+                        details.contactLastName = row.contactLastName;
+                    if (row.contactPhone)
+                        details.contactPhone = row.contactPhone;
+                    if (row.contactEmail)
+                        details.contactEmail = row.contactEmail;
+                }
+                await this.prisma.customer.create({
+                    data: {
+                        tenantId: tenant.id,
+                        customerNumber: row.customerNumber,
+                        customerType: row.customerType,
+                        details: details,
+                    },
+                });
+                importedRows++;
+            }
+            catch (error) {
+                errors.push({
+                    row: rowNumber,
+                    field: 'unknown',
+                    message: error.message || 'Unknown error',
+                });
+            }
+        }
+        this.logger.log(`Bulk import: ${importedRows}/${rows.length} customers imported`);
+        return {
+            success: errors.length === 0,
+            totalRows: rows.length,
+            importedRows,
+            failedRows: rows.length - importedRows,
+            errors,
+        };
+    }
 };
 exports.CustomersService = CustomersService;
 exports.CustomersService = CustomersService = CustomersService_1 = __decorate([

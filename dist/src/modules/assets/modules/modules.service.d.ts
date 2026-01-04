@@ -1,5 +1,5 @@
 import { PrismaService } from '../../../core/prisma/prisma.service';
-import { CreateModuleDto, UpdateModuleDto, ModuleQueryDto, BulkCreateModuleDto } from './dto/module.dto';
+import { CreateModuleDto, UpdateModuleDto, ModuleQueryDto, BulkCreateModuleDto, BulkImportModulesDto, ExportModulesQueryDto } from './dto/module.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../../common/interfaces';
 import { Device } from '@prisma/client';
 type Module = Device;
@@ -24,5 +24,17 @@ export declare class ModulesService {
     delete(id: string, user: AuthenticatedUser): Promise<void>;
     private validateTechnologyAndScenarios;
     private validateDynamicFields;
+    exportModules(query: ExportModulesQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Module>>;
+    bulkImport(dto: BulkImportModulesDto, user: AuthenticatedUser): Promise<{
+        success: boolean;
+        totalRows: number;
+        importedRows: number;
+        failedRows: number;
+        errors: Array<{
+            row: number;
+            field: string;
+            message: string;
+        }>;
+    }>;
 }
 export { ModulesService as DevicesService };

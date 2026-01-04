@@ -16,6 +16,8 @@ import {
   UpdateModuleDto,
   ModuleQueryDto,
   BulkCreateModuleDto,
+  BulkImportModulesDto,
+  ExportModulesQueryDto,
 } from './dto/module.dto';
 import { AuthenticatedUser, PaginatedResult } from '../../../common/interfaces';
 import { PAGINATION, SYSTEM_ROLES } from '../../../common/constants';
@@ -704,6 +706,140 @@ export class ModulesService {
         );
       }
     }
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Export modules with filters (limited to 10,000 rows)
+   */
+  async exportModules(query: ExportModulesQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Module>> {
+    const MAX_EXPORT_LIMIT = 10000;
+    const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+    
+    return this.findAll({ ...query, page: 1, limit }, user);
+  }
+
+  /**
+   * Bulk import modules from CSV data
+   */
+  async bulkImport(dto: BulkImportModulesDto, user: AuthenticatedUser): Promise<{
+    success: boolean;
+    totalRows: number;
+    importedRows: number;
+    failedRows: number;
+    errors: Array<{ row: number; field: string; message: string }>;
+  }> {
+    const { rows, namePrefix = '', nameSuffix = '', moduleProfileId } = dto;
+    const errors: Array<{ row: number; field: string; message: string }> = [];
+    let importedRows = 0;
+
+    // Verify module profile exists
+    const profile = await this.prisma.deviceProfile.findUnique({
+      where: { id: moduleProfileId },
+    });
+
+    if (!profile) {
+      return {
+        success: false,
+        totalRows: rows.length,
+        importedRows: 0,
+        failedRows: rows.length,
+        errors: [{ row: 0, field: 'moduleProfileId', message: 'Module profile not found' }],
+      };
+    }
+
+    // Get user's accessible tenant
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { path: { startsWith: user.tenantPath } },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        totalRows: rows.length,
+        importedRows: 0,
+        failedRows: rows.length,
+        errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+      };
+    }
+
+    // Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 because row 1 is header and arrays are 0-indexed
+
+      try {
+        const serialNumber = `${namePrefix}${row.serialNumber}${nameSuffix}`;
+
+        // Check for duplicate serial number
+        const existingModule = await this.prisma.device.findUnique({
+          where: { serialNumber },
+        });
+
+        if (existingModule) {
+          errors.push({
+            row: rowNumber,
+            field: 'serialNumber',
+            message: `Serial number "${serialNumber}" already exists`,
+          });
+          continue;
+        }
+
+        // Extract dynamic fields from row (exclude known columns)
+        const knownColumns = ['serialNumber', 'status'];
+        const dynamicFields: Record<string, string> = {};
+        
+        for (const [key, value] of Object.entries(row)) {
+          if (!knownColumns.includes(key) && value) {
+            dynamicFields[key] = String(value);
+          }
+        }
+
+        // Validate dynamic fields
+        try {
+          await this.validateDynamicFields(dynamicFields, profile, profile.communicationTechnology);
+        } catch (validationError) {
+          errors.push({
+            row: rowNumber,
+            field: 'dynamicFields',
+            message: validationError.message,
+          });
+          continue;
+        }
+
+        // Create the module
+        await this.prisma.device.create({
+          data: {
+            tenantId: tenant.id,
+            deviceProfileId: moduleProfileId,
+            serialNumber,
+            status: (row.status as DeviceStatus) || DeviceStatus.WAREHOUSE,
+            dynamicFields: dynamicFields as any,
+          },
+        });
+
+        importedRows++;
+      } catch (error) {
+        errors.push({
+          row: rowNumber,
+          field: 'unknown',
+          message: error.message || 'Unknown error',
+        });
+      }
+    }
+
+    this.logger.log(`Bulk import: ${importedRows}/${rows.length} modules imported`);
+
+    return {
+      success: errors.length === 0,
+      totalRows: rows.length,
+      importedRows,
+      failedRows: rows.length - importedRows,
+      errors,
+    };
   }
 }
 

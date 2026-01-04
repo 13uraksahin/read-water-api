@@ -15,3 +15,18 @@ export declare class UpdateCustomerDto {
     details?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
 }
+export declare class CustomerQueryDto {
+    page?: number;
+    limit?: number;
+    tenantId?: string;
+    customerType?: CustomerType;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+export declare class BulkImportCustomersDto {
+    rows: Record<string, string>[];
+}
+export declare class ExportCustomersQueryDto extends CustomerQueryDto {
+    limit?: number;
+}

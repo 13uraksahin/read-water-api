@@ -56,3 +56,54 @@ export class UpdateCustomerDto {
   @IsObject()
   metadata?: Record<string, unknown>;
 }
+
+// =============================================================================
+// Bulk Import/Export DTOs
+// =============================================================================
+
+import { Transform } from 'class-transformer';
+import { IsNumber } from 'class-validator';
+
+export class CustomerQueryDto {
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  page?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  limit?: number;
+
+  @IsUUID()
+  @IsOptional()
+  tenantId?: string;
+
+  @IsEnum(CustomerType)
+  @IsOptional()
+  customerType?: CustomerType;
+
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @IsString()
+  @IsOptional()
+  sortBy?: string;
+
+  @IsString()
+  @IsOptional()
+  sortOrder?: 'asc' | 'desc';
+}
+
+export class BulkImportCustomersDto {
+  @IsOptional()
+  rows: Record<string, string>[];
+}
+
+export class ExportCustomersQueryDto extends CustomerQueryDto {
+  @IsNumber()
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 10000))
+  declare limit?: number;
+}

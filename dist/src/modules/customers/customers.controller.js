@@ -32,6 +32,12 @@ let CustomersController = class CustomersController {
             search,
         }, user);
     }
+    async exportCustomers(user, query) {
+        return this.customersService.exportCustomers(query, user);
+    }
+    async bulkImport(user, dto) {
+        return this.customersService.bulkImport(dto, user);
+    }
     async getCustomer(user, id) {
         return this.customersService.getCustomer(id, user);
     }
@@ -61,6 +67,22 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], CustomersController.prototype, "getCustomers", null);
+__decorate([
+    (0, common_1.Get)('export'),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, customer_dto_1.ExportCustomersQueryDto]),
+    __metadata("design:returntype", Promise)
+], CustomersController.prototype, "exportCustomers", null);
+__decorate([
+    (0, common_1.Post)('bulk-import'),
+    __param(0, (0, decorators_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, customer_dto_1.BulkImportCustomersDto]),
+    __metadata("design:returntype", Promise)
+], CustomersController.prototype, "bulkImport", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, decorators_1.CurrentUser)()),

@@ -374,6 +374,133 @@ let SubscriptionsService = SubscriptionsService_1 = class SubscriptionsService {
         });
         return this.findOne(subscriptionId, user);
     }
+    async exportSubscriptions(query, user) {
+        const MAX_EXPORT_LIMIT = 10000;
+        const limit = Math.min(query.limit || MAX_EXPORT_LIMIT, MAX_EXPORT_LIMIT);
+        return this.findAll({ ...query, page: 1, limit }, user);
+    }
+    async bulkImport(dto, user) {
+        const { rows } = dto;
+        const errors = [];
+        let importedRows = 0;
+        const tenant = await this.prisma.tenant.findFirst({
+            where: { path: { startsWith: user.tenantPath } },
+        });
+        if (!tenant) {
+            return {
+                success: false,
+                totalRows: rows.length,
+                importedRows: 0,
+                failedRows: rows.length,
+                errors: [{ row: 0, field: 'tenant', message: 'No accessible tenant found' }],
+            };
+        }
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNumber = i + 2;
+            try {
+                if (!row.subscriptionNumber) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'subscriptionNumber',
+                        message: 'Subscription number is required',
+                    });
+                    continue;
+                }
+                if (!row.customerNumber) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'customerNumber',
+                        message: 'Customer number is required',
+                    });
+                    continue;
+                }
+                const customer = await this.prisma.customer.findFirst({
+                    where: {
+                        tenantId: tenant.id,
+                        customerNumber: row.customerNumber,
+                    },
+                });
+                if (!customer) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'customerNumber',
+                        message: `Customer with number "${row.customerNumber}" not found`,
+                    });
+                    continue;
+                }
+                const existingSubscription = await this.prisma.subscription.findFirst({
+                    where: {
+                        tenantId: tenant.id,
+                        subscriptionNumber: row.subscriptionNumber,
+                    },
+                });
+                if (existingSubscription) {
+                    errors.push({
+                        row: rowNumber,
+                        field: 'subscriptionNumber',
+                        message: `Subscription number "${row.subscriptionNumber}" already exists`,
+                    });
+                    continue;
+                }
+                const address = {};
+                if (row.city)
+                    address.city = row.city;
+                if (row.district)
+                    address.district = row.district;
+                if (row.neighborhood)
+                    address.neighborhood = row.neighborhood;
+                if (row.street)
+                    address.street = row.street;
+                if (row.buildingNo)
+                    address.buildingNo = row.buildingNo;
+                if (row.floor)
+                    address.floor = row.floor;
+                if (row.doorNo)
+                    address.doorNo = row.doorNo;
+                if (row.postalCode)
+                    address.postalCode = row.postalCode;
+                if (row.addressCode)
+                    address.addressCode = row.addressCode;
+                let subscriptionGroup = 'NORMAL_CONSUMPTION';
+                if (row.subscriptionGroup && ['NORMAL_CONSUMPTION', 'HIGH_CONSUMPTION'].includes(row.subscriptionGroup)) {
+                    subscriptionGroup = row.subscriptionGroup;
+                }
+                const latitude = row.latitude ? parseFloat(row.latitude) : null;
+                const longitude = row.longitude ? parseFloat(row.longitude) : null;
+                await this.prisma.subscription.create({
+                    data: {
+                        tenantId: tenant.id,
+                        customerId: customer.id,
+                        subscriptionNumber: row.subscriptionNumber,
+                        subscriptionGroup: subscriptionGroup,
+                        address: address,
+                        addressCode: row.addressCode || null,
+                        latitude: latitude || null,
+                        longitude: longitude || null,
+                        isActive: true,
+                        startDate: new Date(),
+                    },
+                });
+                importedRows++;
+            }
+            catch (error) {
+                errors.push({
+                    row: rowNumber,
+                    field: 'unknown',
+                    message: error.message || 'Unknown error',
+                });
+            }
+        }
+        this.logger.log(`Bulk import: ${importedRows}/${rows.length} subscriptions imported`);
+        return {
+            success: errors.length === 0,
+            totalRows: rows.length,
+            importedRows,
+            failedRows: rows.length - importedRows,
+            errors,
+        };
+    }
 };
 exports.SubscriptionsService = SubscriptionsService;
 exports.SubscriptionsService = SubscriptionsService = SubscriptionsService_1 = __decorate([

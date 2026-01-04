@@ -15,7 +15,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
-import { CreateSubscriptionDto, UpdateSubscriptionDto, SubscriptionQueryDto } from './dto/subscription.dto';
+import { CreateSubscriptionDto, UpdateSubscriptionDto, SubscriptionQueryDto, BulkImportSubscriptionsDto, ExportSubscriptionsQueryDto } from './dto/subscription.dto';
 import { CurrentUser } from '../../common/decorators';
 import type { AuthenticatedUser } from '../../common/interfaces';
 
@@ -26,6 +26,32 @@ export class SubscriptionsController {
   @Get()
   async findAll(@Query() query: SubscriptionQueryDto, @CurrentUser() user: AuthenticatedUser) {
     return this.subscriptionsService.findAll(query, user);
+  }
+
+  // ==========================================================================
+  // BULK OPERATIONS (must be before :id routes)
+  // ==========================================================================
+
+  /**
+   * Export subscriptions with current filters (limited to 10,000 rows)
+   */
+  @Get('export')
+  async exportSubscriptions(
+    @Query() query: ExportSubscriptionsQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.subscriptionsService.exportSubscriptions(query, user);
+  }
+
+  /**
+   * Bulk import subscriptions from CSV data
+   */
+  @Post('bulk-import')
+  async bulkImport(
+    @Body() dto: BulkImportSubscriptionsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.subscriptionsService.bulkImport(dto, user);
   }
 
   @Get(':id')

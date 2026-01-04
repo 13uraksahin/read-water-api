@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BulkCreateDeviceDto = exports.DeviceQueryDto = exports.UpdateDeviceDto = exports.CreateDeviceDto = exports.BulkCreateModuleDto = exports.ModuleQueryDto = exports.UpdateModuleDto = exports.CreateModuleDto = exports.ModuleStatus = void 0;
+exports.BulkCreateDeviceDto = exports.DeviceQueryDto = exports.UpdateDeviceDto = exports.CreateDeviceDto = exports.ExportModulesQueryDto = exports.BulkImportModulesDto = exports.BulkImportModuleRowDto = exports.BulkCreateModuleDto = exports.ModuleQueryDto = exports.UpdateModuleDto = exports.CreateModuleDto = exports.ModuleStatus = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
@@ -200,4 +200,48 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], BulkCreateModuleDto.prototype, "moduleProfileId", void 0);
+class BulkImportModuleRowDto {
+    serialNumber;
+}
+exports.BulkImportModuleRowDto = BulkImportModuleRowDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], BulkImportModuleRowDto.prototype, "serialNumber", void 0);
+class BulkImportModulesDto {
+    rows;
+    namePrefix;
+    nameSuffix;
+    moduleProfileId;
+}
+exports.BulkImportModulesDto = BulkImportModulesDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], BulkImportModulesDto.prototype, "rows", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], BulkImportModulesDto.prototype, "namePrefix", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], BulkImportModulesDto.prototype, "nameSuffix", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], BulkImportModulesDto.prototype, "moduleProfileId", void 0);
+class ExportModulesQueryDto extends ModuleQueryDto {
+}
+exports.ExportModulesQueryDto = ExportModulesQueryDto;
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : 10000)),
+    __metadata("design:type", Number)
+], ExportModulesQueryDto.prototype, "limit", void 0);
 //# sourceMappingURL=module.dto.js.map

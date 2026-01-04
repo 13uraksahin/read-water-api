@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LinkSubscriptionDto = exports.UnlinkDeviceDto = exports.LinkDeviceDto = exports.ControlValveDto = exports.MeterQueryDto = exports.UpdateMeterDto = exports.CreateMeterDto = void 0;
+exports.ExportQueryDto = exports.BulkImportMetersDto = exports.BulkImportMeterRowDto = exports.LinkSubscriptionDto = exports.UnlinkDeviceDto = exports.LinkDeviceDto = exports.ControlValveDto = exports.MeterQueryDto = exports.UpdateMeterDto = exports.CreateMeterDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
@@ -199,4 +199,67 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], LinkSubscriptionDto.prototype, "subscriptionId", void 0);
+class BulkImportMeterRowDto {
+    serialNumber;
+    initialIndex;
+    installationDate;
+    status;
+}
+exports.BulkImportMeterRowDto = BulkImportMeterRowDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], BulkImportMeterRowDto.prototype, "serialNumber", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : undefined)),
+    __metadata("design:type", Number)
+], BulkImportMeterRowDto.prototype, "initialIndex", void 0);
+__decorate([
+    (0, class_validator_1.IsDateString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], BulkImportMeterRowDto.prototype, "installationDate", void 0);
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.MeterStatus),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], BulkImportMeterRowDto.prototype, "status", void 0);
+class BulkImportMetersDto {
+    rows;
+    namePrefix;
+    nameSuffix;
+    meterProfileId;
+}
+exports.BulkImportMetersDto = BulkImportMetersDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], BulkImportMetersDto.prototype, "rows", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], BulkImportMetersDto.prototype, "namePrefix", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], BulkImportMetersDto.prototype, "nameSuffix", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], BulkImportMetersDto.prototype, "meterProfileId", void 0);
+class ExportQueryDto extends MeterQueryDto {
+}
+exports.ExportQueryDto = ExportQueryDto;
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(({ value }) => (value !== undefined ? Number(value) : 10000)),
+    __metadata("design:type", Number)
+], ExportQueryDto.prototype, "limit", void 0);
 //# sourceMappingURL=meter.dto.js.map
