@@ -26,7 +26,6 @@ export interface CustomerData {
   };
   subscriptions?: Array<{
     id: string;
-    subscriptionType: string;
     subscriptionGroup: string;
     address: Record<string, unknown>;
     isActive: boolean;
@@ -220,7 +219,6 @@ export class CustomersService {
           subscriptions: {
             select: {
               id: true,
-              subscriptionType: true,
               subscriptionGroup: true,
               address: true,
               isActive: true,
@@ -348,7 +346,6 @@ export class CustomersService {
         subscriptions: {
           select: {
             id: true,
-            subscriptionType: true,
             subscriptionGroup: true,
             address: true,
             isActive: true,
@@ -407,7 +404,6 @@ export class CustomersService {
         subscriptions: {
           select: {
             id: true,
-            subscriptionType: true,
             subscriptionGroup: true,
             address: true,
             isActive: true,

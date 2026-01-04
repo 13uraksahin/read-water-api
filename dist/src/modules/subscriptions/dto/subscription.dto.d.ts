@@ -1,7 +1,3 @@
-export declare enum SubscriptionType {
-    INDIVIDUAL = "INDIVIDUAL",
-    ORGANIZATIONAL = "ORGANIZATIONAL"
-}
 export declare enum SubscriptionGroup {
     NORMAL_CONSUMPTION = "NORMAL_CONSUMPTION",
     HIGH_CONSUMPTION = "HIGH_CONSUMPTION"
@@ -22,7 +18,6 @@ export declare class CreateSubscriptionDto {
     tenantId: string;
     subscriptionNumber?: string;
     customerId: string;
-    subscriptionType: SubscriptionType;
     subscriptionGroup?: SubscriptionGroup;
     address: AddressDto;
     addressCode?: string;
@@ -35,7 +30,6 @@ export declare class CreateSubscriptionDto {
 }
 export declare class UpdateSubscriptionDto {
     subscriptionNumber?: string;
-    subscriptionType?: SubscriptionType;
     subscriptionGroup?: SubscriptionGroup;
     address?: AddressDto;
     addressCode?: string;
@@ -51,7 +45,6 @@ export declare class SubscriptionQueryDto {
     tenantId?: string;
     customerId?: string;
     isActive?: boolean;
-    subscriptionType?: SubscriptionType;
     subscriptionGroup?: SubscriptionGroup;
     search?: string;
 }

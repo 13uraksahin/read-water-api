@@ -629,7 +629,6 @@ async function createBulkAssets(tenants, meterProfiles, deviceProfiles) {
                         tenantId,
                         subscriptionNumber: `S-${batch.serialPrefix}-${String(globalSubscriptionCounter).padStart(4, '0')}`,
                         customerId: customers[idx]?.id || customers[0].id,
-                        subscriptionType: client_1.SubscriptionType.INDIVIDUAL,
                         subscriptionGroup: client_1.SubscriptionGroup.NORMAL_CONSUMPTION,
                         address: {
                             city,
@@ -720,7 +719,6 @@ async function createGoldenRecord(tenants, meterProfiles, deviceProfiles) {
                 tenantId: askiId,
                 subscriptionNumber: `SASKI-GOLDEN-00${i + 1}`,
                 customerId: customer.id,
-                subscriptionType: client_1.SubscriptionType.INDIVIDUAL,
                 subscriptionGroup: client_1.SubscriptionGroup.NORMAL_CONSUMPTION,
                 address: {
                     city: 'Ankara',

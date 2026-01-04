@@ -91,9 +91,6 @@ let SubscriptionsService = SubscriptionsService_1 = class SubscriptionsService {
         if (query.isActive !== undefined) {
             where.isActive = query.isActive;
         }
-        if (query.subscriptionType) {
-            where.subscriptionType = query.subscriptionType;
-        }
         if (query.subscriptionGroup) {
             where.subscriptionGroup = query.subscriptionGroup;
         }
@@ -259,7 +256,6 @@ let SubscriptionsService = SubscriptionsService_1 = class SubscriptionsService {
                 tenantId: dto.tenantId,
                 customerId: dto.customerId,
                 subscriptionNumber,
-                subscriptionType: dto.subscriptionType,
                 subscriptionGroup: (dto.subscriptionGroup || 'NORMAL_CONSUMPTION'),
                 address: dto.address,
                 addressCode: dto.addressCode,
@@ -295,7 +291,6 @@ let SubscriptionsService = SubscriptionsService_1 = class SubscriptionsService {
         const subscription = await this.prisma.subscription.update({
             where: { id },
             data: {
-                ...(dto.subscriptionType && { subscriptionType: dto.subscriptionType }),
                 ...(dto.subscriptionGroup && { subscriptionGroup: dto.subscriptionGroup }),
                 ...(dto.address && { address: dto.address }),
                 ...(dto.addressCode !== undefined && { addressCode: dto.addressCode }),

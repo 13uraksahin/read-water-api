@@ -13,7 +13,7 @@ const bullmq_1 = require("@nestjs/bullmq");
 const config_1 = require("@nestjs/config");
 const core_module_1 = require("./core/core.module");
 const iam_module_1 = require("./modules/iam/iam.module");
-const device_module_1 = require("./modules/device/device.module");
+const assets_module_1 = require("./modules/assets/assets.module");
 const ingestion_module_1 = require("./modules/ingestion/ingestion.module");
 const worker_module_1 = require("./modules/worker/worker.module");
 const realtime_module_1 = require("./modules/realtime/realtime.module");
@@ -60,7 +60,7 @@ exports.AppModule = AppModule = __decorate([
             }),
             health_module_1.HealthModule,
             iam_module_1.IamModule,
-            device_module_1.DeviceModule,
+            assets_module_1.AssetsModule,
             ingestion_module_1.IngestionModule,
             worker_module_1.WorkerModule,
             realtime_module_1.RealtimeModule,

@@ -80,7 +80,7 @@ describe('IngestionService', () => {
 
   describe('ingestReading', () => {
     const validDto = {
-      deviceId: '0011223344556677',
+      device: '0011223344556677',
       payload: '0000100000',
       technology: CommunicationTechnology.LORAWAN,
     };
@@ -102,7 +102,7 @@ describe('IngestionService', () => {
         expect.objectContaining({
           tenantId: mockDeviceLookupResult.tenant_id,
           meterId: mockDeviceLookupResult.meter_id,
-          deviceId: validDto.deviceId,
+          deviceId: validDto.device,
           technology: validDto.technology,
           payload: validDto.payload,
         }),
@@ -155,7 +155,7 @@ describe('IngestionService', () => {
 
       const recentDto = {
         ...validDto,
-        timestamp: new Date().toISOString(), // Very recent
+        time: new Date().toISOString(), // Very recent (ISO string)
       };
 
       await service.ingestReading(recentDto);
@@ -178,7 +178,7 @@ describe('IngestionService', () => {
 
       const oldDto = {
         ...validDto,
-        timestamp: oldTimestamp.toISOString(),
+        time: oldTimestamp.toISOString(), // ISO string format
       };
 
       await service.ingestReading(oldDto);
@@ -197,9 +197,9 @@ describe('IngestionService', () => {
     const batchDto = {
       tenantId: 'tenant-uuid-123',
       readings: [
-        { deviceId: 'dev1', payload: 'aabb', technology: CommunicationTechnology.LORAWAN },
-        { deviceId: 'dev2', payload: 'ccdd', technology: CommunicationTechnology.LORAWAN },
-        { deviceId: 'dev3', payload: 'eeff', technology: CommunicationTechnology.LORAWAN },
+        { device: 'dev1', payload: 'aabb', technology: CommunicationTechnology.LORAWAN },
+        { device: 'dev2', payload: 'ccdd', technology: CommunicationTechnology.LORAWAN },
+        { device: 'dev3', payload: 'eeff', technology: CommunicationTechnology.LORAWAN },
       ],
     };
 

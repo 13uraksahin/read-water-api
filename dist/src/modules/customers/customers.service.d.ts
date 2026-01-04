@@ -16,7 +16,6 @@ export interface CustomerData {
     };
     subscriptions?: Array<{
         id: string;
-        subscriptionType: string;
         subscriptionGroup: string;
         address: Record<string, unknown>;
         isActive: boolean;

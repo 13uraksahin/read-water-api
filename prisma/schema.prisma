@@ -128,7 +128,6 @@ model Subscription {
   updatedAt          DateTime          @updatedAt @map("updated_at")
   tenantId           String            @map("tenant_id") @db.Uuid
   customerId         String            @map("customer_id") @db.Uuid
-  subscriptionType   SubscriptionType  @map("subscription_type")
   subscriptionGroup  SubscriptionGroup @default(NORMAL_CONSUMPTION) @map("subscription_group")
   address            Json
   addressCode        String?           @map("address_code")
@@ -147,7 +146,6 @@ model Subscription {
   @@index([tenantId])
   @@index([customerId])
   @@index([isActive])
-  @@index([subscriptionType])
   @@index([subscriptionNumber])
   @@map("subscriptions")
 }
@@ -359,11 +357,6 @@ model RefreshToken {
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
-}
-
-enum SubscriptionType {
-  INDIVIDUAL
-  ORGANIZATIONAL
 }
 
 enum SubscriptionGroup {

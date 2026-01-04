@@ -24,10 +24,10 @@ export const SOCKET_EVENTS = {
   METER_STATUS_CHANGED: 'meter:status-changed',
   METER_VALVE_CHANGED: 'meter:valve-changed',
   
-  // Device events
-  DEVICE_STATUS_CHANGED: 'device:status-changed',
-  DEVICE_LINKED: 'device:linked',
-  DEVICE_UNLINKED: 'device:unlinked',
+  // Module events (communication modules)
+  MODULE_STATUS_CHANGED: 'module:status-changed',
+  MODULE_LINKED: 'module:linked',
+  MODULE_UNLINKED: 'module:unlinked',
   
   // Dashboard events
   DASHBOARD_UPDATE: 'dashboard:update',
@@ -46,9 +46,9 @@ export const CACHE_KEYS = {
   USER_SESSION: (userId: string) => `session:${userId}`,
   TENANT_SETTINGS: (tenantId: string) => `tenant:${tenantId}:settings`,
   METER_PROFILE: (profileId: string) => `profile:${profileId}`,
-  DEVICE_PROFILE: (profileId: string) => `device-profile:${profileId}`,
+  MODULE_PROFILE: (profileId: string) => `module-profile:${profileId}`,
   DECODER_FUNCTION: (decoderId: string) => `decoder:${decoderId}`,
-  DEVICE_LOOKUP: (technology: string, deviceId: string) => `device:${technology}:${deviceId}`,
+  MODULE_LOOKUP: (technology: string, moduleId: string) => `module:${technology}:${moduleId}`,
   RATE_LIMIT: (key: string) => `ratelimit:${key}`,
 } as const;
 
@@ -116,11 +116,17 @@ export const PERMISSIONS = {
   METER_UPDATE: 'meter.update',
   METER_DELETE: 'meter.delete',
   
-  // Device permissions
-  DEVICE_CREATE: 'device.create',
-  DEVICE_READ: 'device.read',
-  DEVICE_UPDATE: 'device.update',
-  DEVICE_DELETE: 'device.delete',
+  // Module permissions (for communication modules, previously called devices)
+  MODULE_CREATE: 'module.create',
+  MODULE_READ: 'module.read',
+  MODULE_UPDATE: 'module.update',
+  MODULE_DELETE: 'module.delete',
+  
+  // Device permissions (legacy aliases for module permissions)
+  DEVICE_CREATE: 'module.create',
+  DEVICE_READ: 'module.read',
+  DEVICE_UPDATE: 'module.update',
+  DEVICE_DELETE: 'module.delete',
   
   // Reading permissions
   READING_READ: 'reading.read',
@@ -186,11 +192,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.METER_READ,
     PERMISSIONS.METER_UPDATE,
     PERMISSIONS.METER_DELETE,
-    // Devices
-    PERMISSIONS.DEVICE_CREATE,
-    PERMISSIONS.DEVICE_READ,
-    PERMISSIONS.DEVICE_UPDATE,
-    PERMISSIONS.DEVICE_DELETE,
+    // Modules (communication modules)
+    PERMISSIONS.MODULE_CREATE,
+    PERMISSIONS.MODULE_READ,
+    PERMISSIONS.MODULE_UPDATE,
+    PERMISSIONS.MODULE_DELETE,
     // Readings
     PERMISSIONS.READING_READ,
     PERMISSIONS.READING_EXPORT,
@@ -225,10 +231,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.METER_CREATE,
     PERMISSIONS.METER_READ,
     PERMISSIONS.METER_UPDATE,
-    // Devices
-    PERMISSIONS.DEVICE_CREATE,
-    PERMISSIONS.DEVICE_READ,
-    PERMISSIONS.DEVICE_UPDATE,
+    // Modules (communication modules)
+    PERMISSIONS.MODULE_CREATE,
+    PERMISSIONS.MODULE_READ,
+    PERMISSIONS.MODULE_UPDATE,
     // Readings
     PERMISSIONS.READING_READ,
     // Customers
@@ -256,8 +262,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.USER_READ,
     // Meters (read only)
     PERMISSIONS.METER_READ,
-    // Devices (read only)
-    PERMISSIONS.DEVICE_READ,
+    // Modules (read only)
+    PERMISSIONS.MODULE_READ,
     // Readings
     PERMISSIONS.READING_READ,
     // Customers (read only)
@@ -277,9 +283,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Meters
     PERMISSIONS.METER_READ,
     PERMISSIONS.METER_UPDATE,
-    // Devices
-    PERMISSIONS.DEVICE_READ,
-    PERMISSIONS.DEVICE_UPDATE,
+    // Modules
+    PERMISSIONS.MODULE_READ,
+    PERMISSIONS.MODULE_UPDATE,
     // Readings
     PERMISSIONS.READING_READ,
     // Subscriptions (read only)

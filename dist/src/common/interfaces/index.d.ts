@@ -46,7 +46,7 @@ export interface ReadingJobData {
     technology: string;
     payload: string;
     timestamp: Date;
-    metadata?: Record<string, any>;
+    metadata?: IntegrationMetadata;
 }
 export interface DecodedReading {
     value: number;
@@ -104,4 +104,61 @@ export interface OrganizationalCustomerDetails {
     contactLastName?: string;
     contactPhone?: string;
     contactEmail?: string;
+}
+export interface SignalMetadata {
+    rssi?: number;
+    snr?: number;
+    avgSnr?: number;
+    signalQuality?: number;
+}
+export interface GatewayMetadata {
+    gatewayId?: string;
+    station?: string;
+    networkServer?: string;
+}
+export interface LoRaWANMetadata extends SignalMetadata, GatewayMetadata {
+    fPort?: number;
+    fCnt?: number;
+    frequency?: number;
+    dr?: number;
+    sf?: number;
+    bandwidth?: number;
+    codingRate?: string;
+    adr?: boolean;
+}
+export interface SigfoxMetadata extends SignalMetadata, GatewayMetadata {
+    seqNumber?: number;
+    nbBaseStations?: number;
+    computedLocation?: {
+        lat: number;
+        lng: number;
+        radius?: number;
+    };
+}
+export interface NBIoTMetadata extends SignalMetadata {
+    cellId?: string;
+    pci?: number;
+    rsrp?: number;
+    rsrq?: number;
+    earfcn?: number;
+}
+export interface IntegrationMetadata extends SignalMetadata, GatewayMetadata {
+    fPort?: number;
+    fCnt?: number;
+    frequency?: number;
+    dr?: number;
+    sf?: number;
+    bandwidth?: number;
+    seqNumber?: number;
+    nbBaseStations?: number;
+    cellId?: string;
+    rsrp?: number;
+    rsrq?: number;
+    batteryLevel?: number;
+    batteryVoltage?: number;
+    temperature?: number;
+    lat?: number;
+    lng?: number;
+    accuracy?: number;
+    [key: string]: unknown;
 }

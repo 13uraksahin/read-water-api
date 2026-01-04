@@ -9,14 +9,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SubscriptionQueryDto = exports.UpdateSubscriptionDto = exports.CreateSubscriptionDto = exports.SubscriptionGroup = exports.SubscriptionType = void 0;
+exports.SubscriptionQueryDto = exports.UpdateSubscriptionDto = exports.CreateSubscriptionDto = exports.SubscriptionGroup = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
-var SubscriptionType;
-(function (SubscriptionType) {
-    SubscriptionType["INDIVIDUAL"] = "INDIVIDUAL";
-    SubscriptionType["ORGANIZATIONAL"] = "ORGANIZATIONAL";
-})(SubscriptionType || (exports.SubscriptionType = SubscriptionType = {}));
 var SubscriptionGroup;
 (function (SubscriptionGroup) {
     SubscriptionGroup["NORMAL_CONSUMPTION"] = "NORMAL_CONSUMPTION";
@@ -88,7 +83,6 @@ class CreateSubscriptionDto {
     tenantId;
     subscriptionNumber;
     customerId;
-    subscriptionType;
     subscriptionGroup;
     address;
     addressCode;
@@ -114,10 +108,6 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateSubscriptionDto.prototype, "customerId", void 0);
-__decorate([
-    (0, class_validator_1.IsEnum)(SubscriptionType),
-    __metadata("design:type", String)
-], CreateSubscriptionDto.prototype, "subscriptionType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(SubscriptionGroup),
@@ -167,7 +157,6 @@ __decorate([
 ], CreateSubscriptionDto.prototype, "metadata", void 0);
 class UpdateSubscriptionDto {
     subscriptionNumber;
-    subscriptionType;
     subscriptionGroup;
     address;
     addressCode;
@@ -184,11 +173,6 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], UpdateSubscriptionDto.prototype, "subscriptionNumber", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(SubscriptionType),
-    __metadata("design:type", String)
-], UpdateSubscriptionDto.prototype, "subscriptionType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(SubscriptionGroup),
@@ -238,7 +222,6 @@ class SubscriptionQueryDto {
     tenantId;
     customerId;
     isActive;
-    subscriptionType;
     subscriptionGroup;
     search;
 }
@@ -271,11 +254,6 @@ __decorate([
     (0, class_transformer_1.Transform)(({ value }) => value === 'true' || value === true),
     __metadata("design:type", Boolean)
 ], SubscriptionQueryDto.prototype, "isActive", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(SubscriptionType),
-    __metadata("design:type", String)
-], SubscriptionQueryDto.prototype, "subscriptionType", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(SubscriptionGroup),

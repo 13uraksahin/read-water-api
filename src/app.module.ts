@@ -12,7 +12,7 @@ import { CoreModule } from './core/core.module';
 
 // Feature Modules
 import { IamModule } from './modules/iam/iam.module';
-import { DeviceModule } from './modules/device/device.module';
+import { AssetsModule } from './modules/assets/assets.module';
 import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { WorkerModule } from './modules/worker/worker.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
@@ -23,7 +23,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { SettingsModule } from './modules/settings/settings.module';
 import { AlarmsModule } from './modules/alarms/alarms.module';
 import { HealthModule } from './modules/health/health.module';
-// Note: DecodersModule removed - decoder logic merged into DeviceProfilesModule
+// Note: DecodersModule removed - decoder logic merged into ModuleProfilesModule
 
 // Guards
 import { JwtAuthGuard } from './modules/iam/auth/guards/jwt-auth.guard';
@@ -66,7 +66,7 @@ import { JwtAuthGuard } from './modules/iam/auth/guards/jwt-auth.guard';
 
     // Feature modules
     IamModule,
-    DeviceModule,
+    AssetsModule,
     IngestionModule,
     WorkerModule,
     RealtimeModule,

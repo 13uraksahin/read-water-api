@@ -143,7 +143,6 @@ let CustomersService = CustomersService_1 = class CustomersService {
                     subscriptions: {
                         select: {
                             id: true,
-                            subscriptionType: true,
                             subscriptionGroup: true,
                             address: true,
                             isActive: true,
@@ -246,7 +245,6 @@ let CustomersService = CustomersService_1 = class CustomersService {
                 subscriptions: {
                     select: {
                         id: true,
-                        subscriptionType: true,
                         subscriptionGroup: true,
                         address: true,
                         isActive: true,
@@ -296,7 +294,6 @@ let CustomersService = CustomersService_1 = class CustomersService {
                 subscriptions: {
                     select: {
                         id: true,
-                        subscriptionType: true,
                         subscriptionGroup: true,
                         address: true,
                         isActive: true,

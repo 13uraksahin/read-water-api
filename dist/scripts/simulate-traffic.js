@@ -257,7 +257,6 @@ function decode(payload) {
                 tenantId: tenant.id,
                 customerId: customer.id,
                 subscriptionNumber: subscriptionCode,
-                subscriptionType: client_1.SubscriptionType.ORGANIZATIONAL,
                 subscriptionGroup: client_1.SubscriptionGroup.NORMAL_CONSUMPTION,
                 address: {
                     city: 'Ankara',

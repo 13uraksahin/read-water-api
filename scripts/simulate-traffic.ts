@@ -49,7 +49,6 @@ import {
   TemperatureType,
   IntegrationType,
   CustomerType,
-  SubscriptionType,
   SubscriptionGroup,
 } from '@prisma/client';
 
@@ -346,7 +345,6 @@ function decode(payload) {
         tenantId: tenant.id,
         customerId: customer.id,
         subscriptionNumber: subscriptionCode,
-        subscriptionType: SubscriptionType.ORGANIZATIONAL,
         subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
         address: {
           city: 'Ankara',

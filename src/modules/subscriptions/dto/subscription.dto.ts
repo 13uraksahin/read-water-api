@@ -16,11 +16,6 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
-export enum SubscriptionType {
-  INDIVIDUAL = 'INDIVIDUAL',
-  ORGANIZATIONAL = 'ORGANIZATIONAL',
-}
-
 export enum SubscriptionGroup {
   NORMAL_CONSUMPTION = 'NORMAL_CONSUMPTION',
   HIGH_CONSUMPTION = 'HIGH_CONSUMPTION',
@@ -80,9 +75,6 @@ export class CreateSubscriptionDto {
   @IsUUID()
   customerId: string;
 
-  @IsEnum(SubscriptionType)
-  subscriptionType: SubscriptionType;
-
   @IsOptional()
   @IsEnum(SubscriptionGroup)
   subscriptionGroup?: SubscriptionGroup;
@@ -127,10 +119,6 @@ export class UpdateSubscriptionDto {
   @IsString()
   @IsNotEmpty()
   subscriptionNumber?: string;
-
-  @IsOptional()
-  @IsEnum(SubscriptionType)
-  subscriptionType?: SubscriptionType;
 
   @IsOptional()
   @IsEnum(SubscriptionGroup)
@@ -191,10 +179,6 @@ export class SubscriptionQueryDto {
   @IsBoolean()
   @Transform(({ value }) => value === 'true' || value === true)
   isActive?: boolean;
-
-  @IsOptional()
-  @IsEnum(SubscriptionType)
-  subscriptionType?: SubscriptionType;
 
   @IsOptional()
   @IsEnum(SubscriptionGroup)

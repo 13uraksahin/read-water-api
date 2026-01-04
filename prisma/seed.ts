@@ -24,7 +24,6 @@ import {
   IPRating,
   MeterStatus,
   CustomerType,
-  SubscriptionType,
   SubscriptionGroup,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -776,7 +775,6 @@ async function createBulkAssets(
               tenantId,
               subscriptionNumber: `S-${batch.serialPrefix}-${String(globalSubscriptionCounter).padStart(4, '0')}`,
               customerId: customers[idx]?.id || customers[0].id,
-              subscriptionType: SubscriptionType.INDIVIDUAL,
               subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
               address: { 
                 city, 
@@ -898,7 +896,6 @@ async function createGoldenRecord(
         tenantId: askiId,
         subscriptionNumber: `SASKI-GOLDEN-00${i + 1}`,
         customerId: customer.id,
-        subscriptionType: SubscriptionType.INDIVIDUAL,
         subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
         address: {
           city: 'Ankara',

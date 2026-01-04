@@ -170,7 +170,6 @@ async function seedTestDataIfNeeded() {
                 tenantId: tenant.id,
                 customerId: customer.id,
                 subscriptionNumber: `TEST-SUB-${Date.now()}-${i}`,
-                subscriptionType: client_1.SubscriptionType.INDIVIDUAL,
                 subscriptionGroup: client_1.SubscriptionGroup.NORMAL_CONSUMPTION,
                 address: { city: 'Ankara', district: loc.name },
                 latitude: loc.lat,

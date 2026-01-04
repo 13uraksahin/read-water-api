@@ -10,13 +10,54 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SigfoxCallbackDto = exports.LoRaWANUplinkDto = exports.IngestBatchDto = exports.IngestReadingDto = void 0;
+exports.IsValidTime = IsValidTime;
+exports.TransformToISOString = TransformToISOString;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
+const utils_1 = require("../../../common/utils");
+function IsValidTime(validationOptions) {
+    return function (object, propertyName) {
+        (0, class_validator_1.registerDecorator)({
+            name: 'isValidTime',
+            target: object.constructor,
+            propertyName: propertyName,
+            options: {
+                message: `${propertyName} must be a valid time value. ` +
+                    'Supported formats: ISO 8601 string (e.g., "2025-01-15T10:30:00Z"), ' +
+                    'epoch seconds (e.g., 1736936400), or epoch milliseconds (e.g., 1736936400000)',
+                ...validationOptions,
+            },
+            validator: {
+                validate(value, _args) {
+                    if (value === undefined || value === null) {
+                        return true;
+                    }
+                    const format = (0, utils_1.detectTimeFormat)(value);
+                    if (format === null) {
+                        return false;
+                    }
+                    const isoString = (0, utils_1.toISOString)(value);
+                    return isoString !== null;
+                },
+            },
+        });
+    };
+}
+function TransformToISOString() {
+    return (0, class_transformer_1.Transform)(({ value }) => {
+        if (value === undefined || value === null) {
+            return undefined;
+        }
+        const isoString = (0, utils_1.toISOString)(value);
+        return isoString ?? value;
+    });
+}
 class IngestReadingDto {
-    deviceId;
+    device;
     payload;
     technology;
-    timestamp;
+    time;
     metadata;
 }
 exports.IngestReadingDto = IngestReadingDto;
@@ -24,7 +65,7 @@ __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
-], IngestReadingDto.prototype, "deviceId", void 0);
+], IngestReadingDto.prototype, "device", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
@@ -36,10 +77,11 @@ __decorate([
     __metadata("design:type", String)
 ], IngestReadingDto.prototype, "technology", void 0);
 __decorate([
-    (0, class_validator_1.IsDateString)(),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], IngestReadingDto.prototype, "timestamp", void 0);
+    IsValidTime(),
+    TransformToISOString(),
+    __metadata("design:type", Object)
+], IngestReadingDto.prototype, "time", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.IsOptional)(),
@@ -55,6 +97,12 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], IngestBatchDto.prototype, "tenantId", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => IngestReadingDto),
+    __metadata("design:type", Array)
+], IngestBatchDto.prototype, "readings", void 0);
 class LoRaWANUplinkDto {
     devEUI;
     data;

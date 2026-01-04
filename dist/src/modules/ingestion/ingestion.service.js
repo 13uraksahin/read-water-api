@@ -21,6 +21,7 @@ const prisma_service_1 = require("../../core/prisma/prisma.service");
 const redis_service_1 = require("../../core/redis/redis.service");
 const constants_1 = require("../../common/constants");
 const client_1 = require("@prisma/client");
+const utils_1 = require("../../common/utils");
 let IngestionService = IngestionService_1 = class IngestionService {
     readingsQueue;
     prisma;
@@ -32,16 +33,16 @@ let IngestionService = IngestionService_1 = class IngestionService {
         this.redisService = redisService;
     }
     async ingestReading(dto) {
-        const timestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
-        const deviceLookup = await this.resolveDevice(dto.deviceId, dto.technology);
+        const timestamp = dto.time ? ((0, utils_1.toDate)(dto.time) ?? new Date()) : new Date();
+        const deviceLookup = await this.resolveDevice(dto.device, dto.technology);
         if (!deviceLookup.meterId) {
-            this.logger.warn(`Device ${dto.deviceId} (${dto.technology}) has no linked meter - ignoring payload`);
-            throw new common_1.BadRequestException(`Device ${dto.deviceId} has no linked meter. Please link it to a meter first.`);
+            this.logger.warn(`Device ${dto.device} (${dto.technology}) has no linked meter - ignoring payload`);
+            throw new common_1.BadRequestException(`Device ${dto.device} has no linked meter. Please link it to a meter first.`);
         }
         const jobData = {
             tenantId: deviceLookup.tenantId,
             meterId: deviceLookup.meterId,
-            deviceId: dto.deviceId,
+            deviceId: dto.device,
             internalDeviceId: deviceLookup.deviceId,
             technology: dto.technology,
             payload: dto.payload,
@@ -65,7 +66,7 @@ let IngestionService = IngestionService_1 = class IngestionService {
                 age: 86400,
             },
         });
-        this.logger.debug(`Queued reading job ${job.id} for device ${dto.deviceId}`);
+        this.logger.debug(`Queued reading job ${job.id} for device ${dto.device}`);
         return {
             jobId: job.id,
             status: 'queued',
@@ -79,17 +80,17 @@ let IngestionService = IngestionService_1 = class IngestionService {
             const chunk = dto.readings.slice(i, i + chunkSize);
             const jobs = await Promise.all(chunk.map(async (reading) => {
                 try {
-                    const timestamp = reading.timestamp ? new Date(reading.timestamp) : new Date();
-                    const deviceLookup = await this.resolveDevice(reading.deviceId, reading.technology);
+                    const timestamp = reading.time ? ((0, utils_1.toDate)(reading.time) ?? new Date()) : new Date();
+                    const deviceLookup = await this.resolveDevice(reading.device, reading.technology);
                     if (!deviceLookup.meterId) {
-                        this.logger.debug(`Skipping device ${reading.deviceId} - no linked meter`);
+                        this.logger.debug(`Skipping device ${reading.device} - no linked meter`);
                         skipped++;
                         return null;
                     }
                     const jobData = {
                         tenantId: dto.tenantId || deviceLookup.tenantId,
                         meterId: deviceLookup.meterId,
-                        deviceId: reading.deviceId,
+                        deviceId: reading.device,
                         internalDeviceId: deviceLookup.deviceId,
                         technology: reading.technology,
                         payload: reading.payload,
@@ -133,14 +134,13 @@ let IngestionService = IngestionService_1 = class IngestionService {
             metadata.dr = dto.txInfo.dr;
         }
         return this.ingestReading({
-            deviceId: dto.devEUI.toLowerCase(),
+            device: dto.devEUI.toLowerCase(),
             payload,
             technology: client_1.CommunicationTechnology.LORAWAN,
             metadata,
         });
     }
     async handleSigfoxCallback(dto) {
-        const timestamp = dto.time ? new Date(dto.time * 1000) : new Date();
         const metadata = {
             seqNumber: dto.seqNumber,
             avgSnr: dto.avgSnr,
@@ -148,15 +148,15 @@ let IngestionService = IngestionService_1 = class IngestionService {
             rssi: dto.rssi,
         };
         return this.ingestReading({
-            deviceId: dto.device.toLowerCase(),
+            device: dto.device.toLowerCase(),
             payload: dto.data,
             technology: client_1.CommunicationTechnology.SIGFOX,
-            timestamp: timestamp.toISOString(),
+            time: dto.time,
             metadata,
         });
     }
     async resolveDevice(deviceId, technology) {
-        const cacheKey = constants_1.CACHE_KEYS.DEVICE_LOOKUP(technology, deviceId);
+        const cacheKey = constants_1.CACHE_KEYS.MODULE_LOOKUP(technology, deviceId);
         const cached = await this.redisService.get(cacheKey);
         if (cached) {
             return JSON.parse(cached);
@@ -215,7 +215,7 @@ let IngestionService = IngestionService_1 = class IngestionService {
     }
     async clearDeviceCache(technology, deviceId) {
         if (technology && deviceId) {
-            await this.redisService.del(constants_1.CACHE_KEYS.DEVICE_LOOKUP(technology, deviceId));
+            await this.redisService.del(constants_1.CACHE_KEYS.MODULE_LOOKUP(technology, deviceId));
         }
         this.logger.log('Device lookup cache cleared');
     }

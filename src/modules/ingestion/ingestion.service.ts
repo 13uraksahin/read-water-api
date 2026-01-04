@@ -14,7 +14,7 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { RedisService } from '../../core/redis/redis.service';
 import { QUEUES, CACHE_KEYS, CACHE_TTL } from '../../common/constants';
-import { ReadingJobData, DeviceLookupResult } from '../../common/interfaces';
+import { ReadingJobData, DeviceLookupResult, IntegrationMetadata } from '../../common/interfaces';
 import {
   IngestReadingDto,
   IngestBatchDto,
@@ -22,6 +22,7 @@ import {
   SigfoxCallbackDto,
 } from './dto/ingestion.dto';
 import { CommunicationTechnology } from '@prisma/client';
+import { toDate } from '../../common/utils';
 
 @Injectable()
 export class IngestionService {
@@ -38,18 +39,19 @@ export class IngestionService {
    * Returns 202 Accepted immediately after queuing
    */
   async ingestReading(dto: IngestReadingDto): Promise<{ jobId: string; status: string }> {
-    const timestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
+    // Convert time to Date object (handles epoch seconds, milliseconds, ISO strings)
+    const timestamp = dto.time ? (toDate(dto.time) ?? new Date()) : new Date();
 
     // NEW FLOW: Lookup Device (not Meter) by device identifier
-    const deviceLookup = await this.resolveDevice(dto.deviceId, dto.technology);
+    const deviceLookup = await this.resolveDevice(dto.device, dto.technology);
 
     // Check if device has a linked meter
     if (!deviceLookup.meterId) {
       this.logger.warn(
-        `Device ${dto.deviceId} (${dto.technology}) has no linked meter - ignoring payload`,
+        `Device ${dto.device} (${dto.technology}) has no linked meter - ignoring payload`,
       );
       throw new BadRequestException(
-        `Device ${dto.deviceId} has no linked meter. Please link it to a meter first.`,
+        `Device ${dto.device} has no linked meter. Please link it to a meter first.`,
       );
     }
 
@@ -57,7 +59,7 @@ export class IngestionService {
     const jobData: ReadingJobData = {
       tenantId: deviceLookup.tenantId,
       meterId: deviceLookup.meterId,
-      deviceId: dto.deviceId,
+      deviceId: dto.device,
       internalDeviceId: deviceLookup.deviceId,
       technology: dto.technology,
       payload: dto.payload,
@@ -85,7 +87,7 @@ export class IngestionService {
       },
     });
 
-    this.logger.debug(`Queued reading job ${job.id} for device ${dto.deviceId}`);
+    this.logger.debug(`Queued reading job ${job.id} for device ${dto.device}`);
 
     return {
       jobId: job.id!,
@@ -108,15 +110,16 @@ export class IngestionService {
       const jobs = await Promise.all(
         chunk.map(async (reading) => {
           try {
-            const timestamp = reading.timestamp ? new Date(reading.timestamp) : new Date();
+            // Convert time to Date object (handles epoch seconds, milliseconds, ISO strings)
+            const timestamp = reading.time ? (toDate(reading.time) ?? new Date()) : new Date();
             const deviceLookup = await this.resolveDevice(
-              reading.deviceId,
+              reading.device,
               reading.technology,
             );
 
             // Skip if no linked meter
             if (!deviceLookup.meterId) {
-              this.logger.debug(`Skipping device ${reading.deviceId} - no linked meter`);
+              this.logger.debug(`Skipping device ${reading.device} - no linked meter`);
               skipped++;
               return null;
             }
@@ -124,7 +127,7 @@ export class IngestionService {
             const jobData: ReadingJobData = {
               tenantId: dto.tenantId || deviceLookup.tenantId,
               meterId: deviceLookup.meterId,
-              deviceId: reading.deviceId,
+              deviceId: reading.device,
               internalDeviceId: deviceLookup.deviceId,
               technology: reading.technology,
               payload: reading.payload,
@@ -166,7 +169,7 @@ export class IngestionService {
     const payload = Buffer.from(dto.data, 'base64').toString('hex');
 
     // Extract metadata
-    const metadata: Record<string, any> = {
+    const metadata: IntegrationMetadata = {
       fPort: dto.fPort,
       fCnt: dto.fCnt,
     };
@@ -186,7 +189,7 @@ export class IngestionService {
     }
 
     return this.ingestReading({
-      deviceId: dto.devEUI.toLowerCase(),
+      device: dto.devEUI.toLowerCase(),
       payload,
       technology: CommunicationTechnology.LORAWAN,
       metadata,
@@ -195,11 +198,10 @@ export class IngestionService {
 
   /**
    * Sigfox callback handler
+   * Note: Sigfox sends time as epoch seconds, which is handled by our time converter
    */
   async handleSigfoxCallback(dto: SigfoxCallbackDto): Promise<{ jobId: string; status: string }> {
-    const timestamp = dto.time ? new Date(dto.time * 1000) : new Date();
-
-    const metadata: Record<string, any> = {
+    const metadata: IntegrationMetadata = {
       seqNumber: dto.seqNumber,
       avgSnr: dto.avgSnr,
       station: dto.station,
@@ -207,10 +209,11 @@ export class IngestionService {
     };
 
     return this.ingestReading({
-      deviceId: dto.device.toLowerCase(),
+      device: dto.device.toLowerCase(),
       payload: dto.data,
       technology: CommunicationTechnology.SIGFOX,
-      timestamp: timestamp.toISOString(),
+      // dto.time is epoch seconds - our time converter will handle it automatically
+      time: dto.time,
       metadata,
     });
   }
@@ -223,7 +226,7 @@ export class IngestionService {
     deviceId: string,
     technology: string,
   ): Promise<DeviceLookupResult> {
-    const cacheKey = CACHE_KEYS.DEVICE_LOOKUP(technology, deviceId);
+    const cacheKey = CACHE_KEYS.MODULE_LOOKUP(technology, deviceId);
 
     // Check Redis cache first
     const cached = await this.redisService.get(cacheKey);
@@ -312,7 +315,7 @@ export class IngestionService {
    */
   async clearDeviceCache(technology?: string, deviceId?: string): Promise<void> {
     if (technology && deviceId) {
-      await this.redisService.del(CACHE_KEYS.DEVICE_LOOKUP(technology, deviceId));
+      await this.redisService.del(CACHE_KEYS.MODULE_LOOKUP(technology, deviceId));
     }
     this.logger.log('Device lookup cache cleared');
   }

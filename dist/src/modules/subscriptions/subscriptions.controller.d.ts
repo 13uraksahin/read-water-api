@@ -14,7 +14,6 @@ export declare class SubscriptionsController {
         isActive: boolean;
         metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        subscriptionType: import("@prisma/client").$Enums.SubscriptionType;
         subscriptionGroup: import("@prisma/client").$Enums.SubscriptionGroup;
         addressCode: string | null;
         startDate: Date;
@@ -32,7 +31,6 @@ export declare class SubscriptionsController {
         isActive: boolean;
         metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        subscriptionType: import("@prisma/client").$Enums.SubscriptionType;
         subscriptionGroup: import("@prisma/client").$Enums.SubscriptionGroup;
         addressCode: string | null;
         startDate: Date;
@@ -50,7 +48,6 @@ export declare class SubscriptionsController {
         isActive: boolean;
         metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        subscriptionType: import("@prisma/client").$Enums.SubscriptionType;
         subscriptionGroup: import("@prisma/client").$Enums.SubscriptionGroup;
         addressCode: string | null;
         startDate: Date;
@@ -68,7 +65,6 @@ export declare class SubscriptionsController {
         isActive: boolean;
         metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        subscriptionType: import("@prisma/client").$Enums.SubscriptionType;
         subscriptionGroup: import("@prisma/client").$Enums.SubscriptionGroup;
         addressCode: string | null;
         startDate: Date;
@@ -87,7 +83,6 @@ export declare class SubscriptionsController {
         isActive: boolean;
         metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        subscriptionType: import("@prisma/client").$Enums.SubscriptionType;
         subscriptionGroup: import("@prisma/client").$Enums.SubscriptionGroup;
         addressCode: string | null;
         startDate: Date;
@@ -105,7 +100,6 @@ export declare class SubscriptionsController {
         isActive: boolean;
         metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        subscriptionType: import("@prisma/client").$Enums.SubscriptionType;
         subscriptionGroup: import("@prisma/client").$Enums.SubscriptionGroup;
         addressCode: string | null;
         startDate: Date;

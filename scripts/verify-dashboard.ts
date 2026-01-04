@@ -34,7 +34,6 @@ import {
   DeviceStatus,
   AlarmStatus,
   AlarmType,
-  SubscriptionType,
   SubscriptionGroup,
 } from '@prisma/client';
 
@@ -273,7 +272,6 @@ async function seedTestDataIfNeeded(): Promise<boolean> {
         tenantId: tenant.id,
         customerId: customer.id,
         subscriptionNumber: `TEST-SUB-${Date.now()}-${i}`,
-        subscriptionType: SubscriptionType.INDIVIDUAL,
         subscriptionGroup: SubscriptionGroup.NORMAL_CONSUMPTION,
         address: { city: 'Ankara', district: loc.name },
         latitude: loc.lat,

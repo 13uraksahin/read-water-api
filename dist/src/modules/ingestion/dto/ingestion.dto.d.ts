@@ -1,10 +1,14 @@
+import { ValidationOptions } from 'class-validator';
 import { CommunicationTechnology } from '@prisma/client';
+import type { IntegrationMetadata } from '../../../common/interfaces';
+export declare function IsValidTime(validationOptions?: ValidationOptions): (object: object, propertyName: string) => void;
+export declare function TransformToISOString(): PropertyDecorator;
 export declare class IngestReadingDto {
-    deviceId: string;
+    device: string;
     payload: string;
     technology: CommunicationTechnology;
-    timestamp?: string;
-    metadata?: Record<string, any>;
+    time?: string | number;
+    metadata?: IntegrationMetadata;
 }
 export declare class IngestBatchDto {
     tenantId?: string;

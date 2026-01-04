@@ -1,0 +1,111 @@
+import { ModulesService } from './modules.service';
+import { CreateModuleDto, UpdateModuleDto, ModuleQueryDto, BulkCreateModuleDto } from './dto/module.dto';
+import type { AuthenticatedUser } from '../../../common/interfaces';
+export declare class ModulesController {
+    private readonly modulesService;
+    constructor(modulesService: ModulesService);
+    create(dto: CreateModuleDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+        deviceProfileId: string;
+    }>;
+    bulkCreate(dto: BulkCreateModuleDto, user: AuthenticatedUser): Promise<{
+        created: number;
+        errors: string[];
+    }>;
+    findAll(query: ModuleQueryDto, user: AuthenticatedUser): Promise<import("../../../common/interfaces").PaginatedResult<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+        deviceProfileId: string;
+    }>>;
+    findAvailable(tenantId: string, meterProfileId: string, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+        deviceProfileId: string;
+    }[]>;
+    findOne(id: string, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+        deviceProfileId: string;
+    } & {
+        meter?: any;
+    }>;
+    update(id: string, dto: UpdateModuleDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+        deviceProfileId: string;
+    }>;
+    patch(id: string, dto: UpdateModuleDto, user: AuthenticatedUser): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        tenantId: string;
+        serialNumber: string;
+        status: import("@prisma/client").$Enums.DeviceStatus;
+        dynamicFields: import("@prisma/client/runtime/library").JsonValue;
+        selectedTechnology: import("@prisma/client").$Enums.CommunicationTechnology | null;
+        activeScenarioIds: string[];
+        lastSignalStrength: number | null;
+        lastBatteryLevel: number | null;
+        lastCommunicationAt: Date | null;
+        deviceProfileId: string;
+    }>;
+    delete(id: string, user: AuthenticatedUser): Promise<void>;
+}
+export { ModulesController as DevicesController };
