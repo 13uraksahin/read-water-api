@@ -41,11 +41,11 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Prune dev dependencies after build
-RUN npm prune --production
-
 # Re-generate Prisma client for production (ensures correct binaries)
 RUN npx prisma generate
+
+# Prune dev dependencies after build (but keep prisma for migrations)
+RUN npm prune --production
 
 # -----------------------------------------------------------------------------
 # Stage 3: Production
