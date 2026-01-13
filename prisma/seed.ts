@@ -1078,8 +1078,20 @@ async function main() {
   // PART A: Teardown
   await teardown();
 
+  // Setup database triggers for ltree
+  console.log('\n🔧 Setting up database triggers...');
+  await prisma.$executeRawUnsafe(`
+    -- Create or replace the trigger for path_ltree
+    DROP TRIGGER IF EXISTS tenant_path_ltree_trigger ON tenants;
+    CREATE TRIGGER tenant_path_ltree_trigger
+      BEFORE INSERT OR UPDATE ON tenants
+      FOR EACH ROW
+      EXECUTE FUNCTION update_tenant_path_ltree();
+  `);
+  console.log('   ✓ Tenant path_ltree trigger created');
+
   // PART B: Data Creation
-  console.log('📊 PART B: DATA CREATION\n');
+  console.log('\n📊 PART B: DATA CREATION\n');
 
   // B.1: Tenants
   const tenants = await createTenants();

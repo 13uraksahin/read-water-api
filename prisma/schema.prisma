@@ -28,7 +28,7 @@ model Tenant {
   tenantSubscriptionStatus TenantSubscriptionStatus @default(TRIAL) @map("tenant_subscription_status")
   subscriptionPlan         String?                  @map("subscription_plan")
   settings                 Json?
-  path_ltree               Unsupported("ltree")?    @default(dbgenerated("(path)::ltree"))
+  path_ltree               Unsupported("ltree")?
   alarms                   Alarm[]
   customers                Customer[]
   devices                  Device[]
