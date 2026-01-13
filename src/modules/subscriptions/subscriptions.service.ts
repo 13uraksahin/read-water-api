@@ -205,8 +205,11 @@ export class SubscriptionsService {
 
     const totalPages = Math.ceil(total / limit);
 
+    // Transform response to use frontend naming (activeModule instead of activeDevice)
+    const transformedSubscriptions = subscriptions.map(sub => this.transformSubscriptionResponse(sub));
+
     return {
-      data: subscriptions,
+      data: transformedSubscriptions,
       meta: {
         total,
         page,
@@ -270,7 +273,39 @@ export class SubscriptionsService {
       throw new ForbiddenException('You do not have access to this subscription');
     }
 
-    return subscription;
+    // Transform response to use frontend naming (activeModule instead of activeDevice)
+    return this.transformSubscriptionResponse(subscription);
+  }
+
+  /**
+   * Transform subscription response to use frontend naming conventions
+   * activeDevice → activeModule, deviceProfile → moduleProfile
+   */
+  private transformSubscriptionResponse(subscription: any): any {
+    if (!subscription) return subscription;
+    
+    const transformed = { ...subscription };
+    
+    if (transformed.meters && Array.isArray(transformed.meters)) {
+      transformed.meters = transformed.meters.map((meter: any) => {
+        const transformedMeter = { ...meter };
+        
+        // Transform activeDevice to activeModule
+        if (meter.activeDevice) {
+          const device = meter.activeDevice;
+          transformedMeter.activeModule = {
+            ...device,
+            moduleProfile: device.deviceProfile,
+          };
+          delete transformedMeter.activeModule.deviceProfile;
+        }
+        delete transformedMeter.activeDevice;
+        
+        return transformedMeter;
+      });
+    }
+    
+    return transformed;
   }
 
   /**

@@ -88,7 +88,7 @@ let ModulesService = ModulesService_1 = class ModulesService {
             },
         });
         this.logger.log(`Created module: ${module.serialNumber}`);
-        return module;
+        return this.transformModuleResponse(module);
     }
     async bulkCreate(dto, user) {
         const tenant = await this.prisma.tenant.findUnique({
@@ -238,8 +238,9 @@ let ModulesService = ModulesService_1 = class ModulesService {
             }),
             this.prisma.device.count({ where: whereClause }),
         ]);
+        const transformedModules = modules.map(m => this.transformModuleResponse(m));
         return {
-            data: modules,
+            data: transformedModules,
             meta: {
                 total,
                 page,
@@ -273,7 +274,7 @@ let ModulesService = ModulesService_1 = class ModulesService {
             throw new common_1.NotFoundException('Meter profile not found');
         }
         const compatibleProfileIds = meterProfile.compatibleDeviceProfiles.map((p) => p.id);
-        return this.prisma.device.findMany({
+        const modules = await this.prisma.device.findMany({
             where: {
                 tenantId,
                 status: client_1.DeviceStatus.WAREHOUSE,
@@ -290,6 +291,7 @@ let ModulesService = ModulesService_1 = class ModulesService {
             },
             orderBy: { serialNumber: 'asc' },
         });
+        return modules.map(m => this.transformModuleResponse(m));
     }
     async findOne(id, user) {
         const module = await this.prisma.device.findUnique({
@@ -308,7 +310,9 @@ let ModulesService = ModulesService_1 = class ModulesService {
                             select: {
                                 id: true,
                                 address: true,
-                                customer: { select: { id: true, details: true } },
+                                subscriptionNumber: true,
+                                subscriptionGroup: true,
+                                customer: { select: { id: true, details: true, customerType: true } },
                             },
                         },
                         meterProfile: {
@@ -325,7 +329,17 @@ let ModulesService = ModulesService_1 = class ModulesService {
         if (!hasAccess) {
             throw new common_1.ForbiddenException('You do not have access to this module');
         }
-        return module;
+        return this.transformModuleResponse(module);
+    }
+    transformModuleResponse(module) {
+        if (!module)
+            return module;
+        const transformed = { ...module };
+        if (module.deviceProfile) {
+            transformed.moduleProfile = module.deviceProfile;
+            delete transformed.deviceProfile;
+        }
+        return transformed;
     }
     async findByDynamicField(fieldName, fieldValue) {
         const modules = await this.prisma.$queryRaw `
@@ -389,7 +403,7 @@ let ModulesService = ModulesService_1 = class ModulesService {
             },
         });
         this.logger.log(`Updated module: ${updated.serialNumber}`);
-        return updated;
+        return this.transformModuleResponse(updated);
     }
     async delete(id, user) {
         const module = await this.findOne(id, user);

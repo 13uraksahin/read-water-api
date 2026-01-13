@@ -19,6 +19,7 @@ export declare class ModulesService {
     findOne(id: string, user: AuthenticatedUser): Promise<Module & {
         meter?: any;
     }>;
+    private transformModuleResponse;
     findByDynamicField(fieldName: string, fieldValue: string): Promise<Module | null>;
     update(id: string, dto: UpdateModuleDto, user: AuthenticatedUser): Promise<Module>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;

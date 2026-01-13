@@ -164,8 +164,9 @@ let SubscriptionsService = SubscriptionsService_1 = class SubscriptionsService {
             }),
         ]);
         const totalPages = Math.ceil(total / limit);
+        const transformedSubscriptions = subscriptions.map(sub => this.transformSubscriptionResponse(sub));
         return {
-            data: subscriptions,
+            data: transformedSubscriptions,
             meta: {
                 total,
                 page,
@@ -221,7 +222,28 @@ let SubscriptionsService = SubscriptionsService_1 = class SubscriptionsService {
         if (!hasAccess) {
             throw new common_1.ForbiddenException('You do not have access to this subscription');
         }
-        return subscription;
+        return this.transformSubscriptionResponse(subscription);
+    }
+    transformSubscriptionResponse(subscription) {
+        if (!subscription)
+            return subscription;
+        const transformed = { ...subscription };
+        if (transformed.meters && Array.isArray(transformed.meters)) {
+            transformed.meters = transformed.meters.map((meter) => {
+                const transformedMeter = { ...meter };
+                if (meter.activeDevice) {
+                    const device = meter.activeDevice;
+                    transformedMeter.activeModule = {
+                        ...device,
+                        moduleProfile: device.deviceProfile,
+                    };
+                    delete transformedMeter.activeModule.deviceProfile;
+                }
+                delete transformedMeter.activeDevice;
+                return transformedMeter;
+            });
+        }
+        return transformed;
     }
     async generateSubscriptionNumber(tenantId) {
         const count = await this.prisma.subscription.count({

@@ -10,6 +10,7 @@ export declare class SubscriptionsService {
     private getEffectiveTenantPath;
     findAll(query: SubscriptionQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Subscription>>;
     findOne(id: string, user: AuthenticatedUser): Promise<Subscription>;
+    private transformSubscriptionResponse;
     private generateSubscriptionNumber;
     create(dto: CreateSubscriptionDto, user: AuthenticatedUser): Promise<Subscription>;
     update(id: string, dto: UpdateSubscriptionDto, user: AuthenticatedUser): Promise<Subscription>;

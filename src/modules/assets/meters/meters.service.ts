@@ -148,7 +148,7 @@ export class MetersService {
     });
 
     this.logger.log(`Created meter: ${meter.serialNumber}`);
-    return meter;
+    return this.transformMeterResponse(meter);
   }
 
   /**
@@ -291,8 +291,11 @@ export class MetersService {
       this.prisma.meter.count({ where: whereClause }),
     ]);
 
+    // Transform response to use frontend naming (activeModule instead of activeDevice)
+    const transformedMeters = meters.map(meter => this.transformMeterResponse(meter));
+
     return {
-      data: meters,
+      data: transformedMeters,
       meta: {
         total,
         page,
@@ -347,7 +350,31 @@ export class MetersService {
       throw new ForbiddenException('You do not have access to this meter');
     }
 
-    return meter;
+    // Transform response to use frontend naming (activeModule instead of activeDevice)
+    return this.transformMeterResponse(meter);
+  }
+
+  /**
+   * Transform meter response to use frontend naming conventions
+   * activeDevice → activeModule, deviceProfile → moduleProfile
+   */
+  private transformMeterResponse(meter: any): any {
+    if (!meter) return meter;
+    
+    const transformed = { ...meter };
+    
+    // Transform activeDevice to activeModule
+    if (meter.activeDevice) {
+      const device = meter.activeDevice;
+      transformed.activeModule = {
+        ...device,
+        moduleProfile: device.deviceProfile,
+      };
+      delete transformed.activeModule.deviceProfile;
+    }
+    delete transformed.activeDevice;
+    
+    return transformed;
   }
 
   /**
@@ -416,7 +443,7 @@ export class MetersService {
     });
 
     this.logger.log(`Updated meter: ${updated.serialNumber}`);
-    return updated;
+    return this.transformMeterResponse(updated);
   }
 
   /**
@@ -489,7 +516,7 @@ export class MetersService {
     });
 
     this.logger.log(`Linked meter ${meter.serialNumber} to subscription ${dto.subscriptionId}`);
-    return updated;
+    return this.transformMeterResponse(updated);
   }
 
   /**
@@ -516,7 +543,7 @@ export class MetersService {
     });
 
     this.logger.log(`Unlinked meter ${meter.serialNumber} from subscription`);
-    return updated;
+    return this.transformMeterResponse(updated);
   }
 
   /**
@@ -615,7 +642,7 @@ export class MetersService {
     });
 
     this.logger.log(`Linked device ${device.serialNumber} to meter ${meter.serialNumber}`);
-    return updated;
+    return this.transformMeterResponse(updated);
   }
 
   /**
@@ -673,7 +700,7 @@ export class MetersService {
     });
 
     this.logger.log(`Unlinked device from meter ${meter.serialNumber}`);
-    return updated;
+    return this.transformMeterResponse(updated);
   }
 
   /**

@@ -13,6 +13,7 @@ export declare class MetersService {
     private getEffectiveTenantPath;
     findAll(query: MeterQueryDto, user: AuthenticatedUser): Promise<PaginatedResult<Meter>>;
     findOne(id: string, user: AuthenticatedUser): Promise<Meter>;
+    private transformMeterResponse;
     update(id: string, dto: UpdateMeterDto, user: AuthenticatedUser): Promise<Meter>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
     linkSubscription(meterId: string, dto: LinkSubscriptionDto, user: AuthenticatedUser): Promise<Meter>;

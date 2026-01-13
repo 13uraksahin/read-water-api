@@ -104,7 +104,7 @@ let MetersService = MetersService_1 = class MetersService {
             },
         });
         this.logger.log(`Created meter: ${meter.serialNumber}`);
-        return meter;
+        return this.transformMeterResponse(meter);
     }
     async getEffectiveTenantPath(user, tenantId) {
         if (user.role === constants_1.SYSTEM_ROLES.PLATFORM_ADMIN) {
@@ -210,8 +210,9 @@ let MetersService = MetersService_1 = class MetersService {
             }),
             this.prisma.meter.count({ where: whereClause }),
         ]);
+        const transformedMeters = meters.map(meter => this.transformMeterResponse(meter));
         return {
-            data: meters,
+            data: transformedMeters,
             meta: {
                 total,
                 page,
@@ -258,7 +259,22 @@ let MetersService = MetersService_1 = class MetersService {
         if (!hasAccess) {
             throw new common_1.ForbiddenException('You do not have access to this meter');
         }
-        return meter;
+        return this.transformMeterResponse(meter);
+    }
+    transformMeterResponse(meter) {
+        if (!meter)
+            return meter;
+        const transformed = { ...meter };
+        if (meter.activeDevice) {
+            const device = meter.activeDevice;
+            transformed.activeModule = {
+                ...device,
+                moduleProfile: device.deviceProfile,
+            };
+            delete transformed.activeModule.deviceProfile;
+        }
+        delete transformed.activeDevice;
+        return transformed;
     }
     async update(id, dto, user) {
         const meter = await this.findOne(id, user);
@@ -311,7 +327,7 @@ let MetersService = MetersService_1 = class MetersService {
             },
         });
         this.logger.log(`Updated meter: ${updated.serialNumber}`);
-        return updated;
+        return this.transformMeterResponse(updated);
     }
     async delete(id, user) {
         const meter = await this.findOne(id, user);
@@ -358,7 +374,7 @@ let MetersService = MetersService_1 = class MetersService {
             },
         });
         this.logger.log(`Linked meter ${meter.serialNumber} to subscription ${dto.subscriptionId}`);
-        return updated;
+        return this.transformMeterResponse(updated);
     }
     async unlinkSubscription(meterId, user) {
         const meter = await this.findOne(meterId, user);
@@ -375,7 +391,7 @@ let MetersService = MetersService_1 = class MetersService {
             },
         });
         this.logger.log(`Unlinked meter ${meter.serialNumber} from subscription`);
-        return updated;
+        return this.transformMeterResponse(updated);
     }
     async linkDevice(meterId, dto, user) {
         const meter = await this.findOne(meterId, user);
@@ -445,7 +461,7 @@ let MetersService = MetersService_1 = class MetersService {
             return updatedMeter;
         });
         this.logger.log(`Linked device ${device.serialNumber} to meter ${meter.serialNumber}`);
-        return updated;
+        return this.transformMeterResponse(updated);
     }
     async unlinkDevice(meterId, dto, user) {
         const meter = await this.findOne(meterId, user);
@@ -488,7 +504,7 @@ let MetersService = MetersService_1 = class MetersService {
             return updatedMeter;
         });
         this.logger.log(`Unlinked device from meter ${meter.serialNumber}`);
-        return updated;
+        return this.transformMeterResponse(updated);
     }
     async controlValve(id, dto, user) {
         const meter = await this.findOne(id, user);

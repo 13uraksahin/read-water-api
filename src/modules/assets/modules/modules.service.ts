@@ -135,7 +135,7 @@ export class ModulesService {
     });
 
     this.logger.log(`Created module: ${module.serialNumber}`);
-    return module;
+    return this.transformModuleResponse(module);
   }
 
   /**
@@ -346,8 +346,11 @@ export class ModulesService {
       this.prisma.device.count({ where: whereClause }),
     ]);
 
+    // Transform response to use frontend naming (moduleProfile instead of deviceProfile)
+    const transformedModules = modules.map(m => this.transformModuleResponse(m));
+
     return {
-      data: modules,
+      data: transformedModules,
       meta: {
         total,
         page,
@@ -397,7 +400,7 @@ export class ModulesService {
       (p) => p.id,
     );
 
-    return this.prisma.device.findMany({
+    const modules = await this.prisma.device.findMany({
       where: {
         tenantId,
         status: DeviceStatus.WAREHOUSE,
@@ -414,6 +417,9 @@ export class ModulesService {
       },
       orderBy: { serialNumber: 'asc' },
     });
+
+    // Transform response to use frontend naming
+    return modules.map(m => this.transformModuleResponse(m));
   }
 
   /**
@@ -437,7 +443,9 @@ export class ModulesService {
               select: { 
                 id: true, 
                 address: true,
-                customer: { select: { id: true, details: true } },
+                subscriptionNumber: true,
+                subscriptionGroup: true,
+                customer: { select: { id: true, details: true, customerType: true } },
               },
             },
             meterProfile: {
@@ -453,12 +461,31 @@ export class ModulesService {
     }
 
     // Check access (hierarchical OR direct assignment)
-    const hasAccess = await this.hasUserAccessToTenant(user, module.tenant.path, module.tenantId);
+    const hasAccess = await this.hasUserAccessToTenant(user, (module as any).tenant.path, module.tenantId);
     if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this module');
     }
 
-    return module;
+    // Transform response to use frontend naming (moduleProfile instead of deviceProfile)
+    return this.transformModuleResponse(module);
+  }
+
+  /**
+   * Transform module response to use frontend naming conventions
+   * deviceProfile → moduleProfile
+   */
+  private transformModuleResponse(module: any): any {
+    if (!module) return module;
+    
+    const transformed = { ...module };
+    
+    // Transform deviceProfile to moduleProfile
+    if (module.deviceProfile) {
+      transformed.moduleProfile = module.deviceProfile;
+      delete transformed.deviceProfile;
+    }
+    
+    return transformed;
   }
 
   /**
@@ -558,7 +585,7 @@ export class ModulesService {
     });
 
     this.logger.log(`Updated module: ${updated.serialNumber}`);
-    return updated;
+    return this.transformModuleResponse(updated);
   }
 
   /**
