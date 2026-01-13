@@ -48,7 +48,7 @@ const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const bcrypt = __importStar(require("bcrypt"));
-const uuid_1 = require("uuid");
+const crypto_1 = require("crypto");
 const prisma_service_1 = require("../../../core/prisma/prisma.service");
 const redis_service_1 = require("../../../core/redis/redis.service");
 const constants_1 = require("../../../common/constants");
@@ -339,7 +339,7 @@ let AuthService = AuthService_1 = class AuthService {
         const accessToken = this.jwtService.sign(payload, {
             expiresIn: expiresIn,
         });
-        const refreshToken = (0, uuid_1.v4)();
+        const refreshToken = (0, crypto_1.randomUUID)();
         const refreshExpiresAt = new Date();
         refreshExpiresAt.setDate(refreshExpiresAt.getDate() + parseInt(refreshExpiresIn.replace('d', ''), 10));
         await this.prisma.refreshToken.create({

@@ -11,7 +11,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { RedisService } from '../../../core/redis/redis.service';
 import { JwtPayload } from '../../../common/interfaces';
@@ -412,7 +412,7 @@ export class AuthService {
     });
 
     // Generate refresh token
-    const refreshToken = uuidv4();
+    const refreshToken = randomUUID();
     const refreshExpiresAt = new Date();
     refreshExpiresAt.setDate(
       refreshExpiresAt.getDate() + parseInt(refreshExpiresIn.replace('d', ''), 10),
