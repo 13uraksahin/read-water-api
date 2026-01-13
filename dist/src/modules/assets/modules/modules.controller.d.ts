@@ -8,8 +8,8 @@ export declare class ModulesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -18,7 +18,7 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     }>;
     bulkCreate(dto: BulkCreateModuleDto, user: AuthenticatedUser): Promise<{
         created: number;
@@ -28,8 +28,8 @@ export declare class ModulesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -38,14 +38,14 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     }>>;
     findAvailable(tenantId: string, meterProfileId: string, user: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -54,14 +54,14 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     }[]>;
     exportModules(query: ExportModulesQueryDto, user: AuthenticatedUser): Promise<import("../../../common/interfaces").PaginatedResult<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -70,7 +70,7 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     }>>;
     bulkImport(dto: BulkImportModulesDto, user: AuthenticatedUser): Promise<{
         success: boolean;
@@ -87,8 +87,8 @@ export declare class ModulesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -97,7 +97,7 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     } & {
         meter?: any;
     }>;
@@ -105,8 +105,8 @@ export declare class ModulesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -115,14 +115,14 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     }>;
     patch(id: string, dto: UpdateModuleDto, user: AuthenticatedUser): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
         tenantId: string;
-        deviceProfileId: string;
         serialNumber: string;
         status: import("@prisma/client").$Enums.DeviceStatus;
         dynamicFields: import("@prisma/client/runtime/library").JsonValue;
@@ -131,7 +131,7 @@ export declare class ModulesController {
         lastSignalStrength: number | null;
         lastBatteryLevel: number | null;
         lastCommunicationAt: Date | null;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        deviceProfileId: string;
     }>;
     delete(id: string, user: AuthenticatedUser): Promise<void>;
 }
