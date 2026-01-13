@@ -41,11 +41,12 @@ COPY . .
 # Build the application
 RUN npm run build
 
+# Prune dev dependencies after build
+# Note: ts-node and typescript are now in dependencies for seed script
+RUN npm prune --production
+
 # Re-generate Prisma client for production (ensures correct binaries)
 RUN npx prisma generate
-
-# Prune dev dependencies after build (but keep prisma for migrations)
-RUN npm prune --production
 
 # -----------------------------------------------------------------------------
 # Stage 3: Production
@@ -65,6 +66,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/tsconfig.json ./tsconfig.json
 
 # Set environment variables
 ENV NODE_ENV=production
