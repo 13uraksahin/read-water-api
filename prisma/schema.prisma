@@ -1,12 +1,12 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  extensions = [ltree, pgcrypto, timescaledb, uuid_ossp(map: "uuid-ossp")]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Extensions are managed by docker/postgres/init/01-extensions.sql
+  // Do NOT add extensions here to avoid version conflicts with TimescaleDB
 }
 
 model Tenant {
